@@ -1,3 +1,5 @@
+test-openssl-output.txt
+
 *.log
 wp-config.php
 wp-content/advanced-cache.php

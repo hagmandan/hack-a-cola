@@ -1,0 +1,102 @@
+*.log
+wp-config.php
+wp-content/advanced-cache.php
+wp-content/backup-db/
+wp-content/backups/
+wp-content/blogs.dir/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/uploads/
+wp-content/mu-plugins/
+wp-content/wp-cache-config.php
+wp-content/plugins/hello.php
+
+/.htaccess
+/license.txt
+/readme.html
+/sitemap.xml
+/sitemap.xml.gz
+
+# Repository management
+.svn
+
+# git-deploy status file:
+/.deploy
+
+# Editors
+*.kate-swp
+*~
+\#*#
+.#*
+.*.swp
+.project
+cscope.files
+cscope.out
+*.orig
+## NetBeans
+nbproject*
+project.index
+## Sublime
+sublime-*
+sftp-config.json
+
+# MediaWiki install & usage
+/wiki/cache
+/wiki/docs/js
+/wiki/images/[0-9a-f]
+/wiki/images/archive
+/wiki/images/cache
+/wiki/images/deleted
+/wiki/images/lockdir
+/wiki/images/temp
+/wiki/images/thumb
+## Extension:EasyTimeline
+/wiki/images/timeline
+## Extension:Score
+/wiki/images/lilypond
+## Extension:TimedMediaHandler
+/wiki/images/transcoded
+/wiki/images/tmp
+/wiki/maintenance/.mweval_history
+/wiki/maintenance/.mwsql_history
+/wiki/maintenance/dev/data
+/wiki/AdminSettings.php
+/wiki/LocalSettings.php
+/wiki/StartProfiler.php
+*LocalSettings*
+/wiki/*LocalSettings*
+
+
+# Building & testing
+npm-debug.log
+node_modules/
+/tests/phpunit/phpunit.phar
+/tests/selenium/log
+
+# Composer
+/vendor
+/composer.lock
+/composer.local.json
+/composer.phar
+
+# MediaWiki UI documentation
+/wiki/docs/kss/static
+
+# Operating systems
+## Mac OS X
+.DS_Store
+## Windows
+Thumbs.db
+
+# Misc
+.buildpath
+.classpath
+.idea
+.metadata*
+.settings
+/static*
+/tags
+/.htaccess
+/.htpasswd
+/tests/phan/issues
+*.rej

@@ -1,0 +1,92 @@
+root@hack_a_cola:/var/www/html/hack-a-cola.org/public_html# openssl s_client -CApath /etc/ssl/certs/ -connect hack-a-cola.org:443
+CONNECTED(00000003)
+depth=0 C = US, ST = California, L = Black Rock City, O = Hack-a-Cola, OU = bar, CN = www.hack-a-cola.org, emailAddress = hagman.dan@gmail.com
+verify error:num=18:self signed certificate
+verify return:1
+depth=0 C = US, ST = California, L = Black Rock City, O = Hack-a-Cola, OU = bar, CN = www.hack-a-cola.org, emailAddress = hagman.dan@gmail.com
+verify return:1
+---
+Certificate chain
+ 0 s:/C=US/ST=California/L=Black Rock City/O=Hack-a-Cola/OU=bar/CN=www.hack-a-cola.org/emailAddress=hagman.dan@gmail.com
+   i:/C=US/ST=California/L=Black Rock City/O=Hack-a-Cola/OU=bar/CN=www.hack-a-cola.org/emailAddress=hagman.dan@gmail.com
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+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
+-----END CERTIFICATE-----
+subject=/C=US/ST=California/L=Black Rock City/O=Hack-a-Cola/OU=bar/CN=www.hack-a-cola.org/emailAddress=hagman.dan@gmail.com
+issuer=/C=US/ST=California/L=Black Rock City/O=Hack-a-Cola/OU=bar/CN=www.hack-a-cola.org/emailAddress=hagman.dan@gmail.com
+---
+No client certificate CA names sent
+Peer signing digest: SHA512
+Server Temp Key: ECDH, P-256, 256 bits
+---
+SSL handshake has read 2514 bytes and written 431 bytes
+---
+New, TLSv1/SSLv3, Cipher is ECDHE-RSA-AES256-GCM-SHA384
+Server public key is 4096 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+SSL-Session:
+    Protocol  : TLSv1.2
+    Cipher    : ECDHE-RSA-AES256-GCM-SHA384
+    Session-ID: 51E92CC26178F87F7B063F690C9477ADA0C3CDD07488A29A3B4CBB58BFE9901E
+    Session-ID-ctx:
+    Master-Key: 2948653C7AB297EA8E65FF17D8C1E57AD76040A825B99FE05E0525AEAF54CE07C05D1E50CBD3EB715D4569130C622D23
+    Key-Arg   : None
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 73 5f bd ea 7b de 8f 1f-26 4e fc 8f 24 20 e3 02   s_..{...&N..$ ..
+    0010 - 2c 37 2b 99 3d b9 bb 82-e5 fb fb 31 f0 e2 ec 94   ,7+.=......1....
+    0020 - a7 ef cf 8f 25 01 0d 20-d1 81 9f c1 9f 2b 43 c5   ....%.. .....+C.
+    0030 - 19 9d 4f 2f 4d 15 1c 81-a6 72 ba 6e 6c 81 af f7   ..O/M....r.nl...
+    0040 - 22 55 11 e9 18 e0 aa 1a-0b a6 10 b4 46 04 f9 42   "U..........F..B
+    0050 - 09 61 91 c2 95 1d 4e 83-94 a8 40 13 9d 7d 82 d0   .a....N...@..}..
+    0060 - 4c 03 06 d7 7b 2e 7c 02-c6 15 26 d8 1d 54 0b 5a   L...{.|...&..T.Z
+    0070 - 1f 78 2b 71 94 a0 ad e1-6c 7a 40 c1 5e 82 2c d2   .x+q....lz@.^.,.
+    0080 - 3c 38 6a 2e 24 62 b9 65-42 e6 6c 95 2e 41 20 5b   <8j.$b.eB.l..A [
+    0090 - 41 e5 89 22 b6 26 3e 0f-f0 c3 a7 86 cf eb 6b 7a   A..".&>.......kz
+    00a0 - a9 56 c5 83 72 2d df 1c-61 70 77 3f ee 0f b1 4c   .V..r-..apw?...L
+    00b0 - c6 e5 12 1f f3 f6 f0 38-f1 69 30 c3 d0 f9 7c 8e   .......8.i0...|.
+
+    Start Time: 1530463918
+    Timeout   : 300 (sec)
+    Verify return code: 18 (self signed certificate)
+---

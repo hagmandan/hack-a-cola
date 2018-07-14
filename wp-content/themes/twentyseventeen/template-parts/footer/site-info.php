@@ -15,5 +15,5 @@
 		the_privacy_policy_link( '', '<span role="separator" aria-hidden="true"></span>' );
 	}
 	?>
-  &copy; <?php echo date('Y'); ?>
 </div><!-- .site-info -->
+<span class="copyright">&copy; <?php echo date('Y'); ?></span>

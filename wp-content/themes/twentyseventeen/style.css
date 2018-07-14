@@ -2384,6 +2384,15 @@ body:not(.twentyseventeen-front-page) .entry-header {
 .site-info span[role=separator]::before {
 	content: '\002f';
 }
+.printfooter {
+	display: none;
+}
+.copyright {
+	clear: both;
+	display: block;
+	text-align: center;
+	font-size: 0.75em;
+}
 
 /*--------------------------------------------------------------
 14.0 Comments
@@ -4163,7 +4172,10 @@ p > object:only-child {
 --------------------------------------------------------------*/
 
 @media print {
-
+	/* Show elements */
+	.printfooter {
+		display: block;
+	}
 	/* Hide elements */
 
 	form,
@@ -4399,4 +4411,14 @@ p > object:only-child {
 	margin: 3em 0 0;
 	padding: 1em;
 	color: rgba(0,0,0,0.45);
+}
+
+/* for p empty p tags that have a br in them, hide the br */
+#rdp-we-main p > br:first-child:last-child {
+    display: none;
+}
+
+#page #rdp-we-main .firstHeading {
+	margin: 1em 0 .5em;
+  padding-bottom: .25em;
 }

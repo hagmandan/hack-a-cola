@@ -6,8 +6,7 @@
 			"DavidL",
 			"Gomoko",
 			"Jean-Frédéric",
-			"Od1n",
-			"DePlusJean"
+			"Od1n"
 		]
 	},
 	"skinname-vector": "Vector",
@@ -22,7 +21,7 @@
 	"vector-action-unprotect": "Changer la protection",
 	"vector-view-create": "Créer",
 	"vector-view-edit": "Modifier",
-	"vector-view-history": "Afficher l’historique",
+	"vector-view-history": "Historique",
 	"vector-view-view": "Lire",
 	"vector-view-viewsource": "Voir la source",
 	"vector-more-actions": "Plus"

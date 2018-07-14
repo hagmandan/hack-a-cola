@@ -1,12 +1,11 @@
 {
 	"@metadata": {
 		"authors": [
-			"Waldir",
-			"Quintino Lopes Castro Tavares"
+			"Waldir"
 		]
 	},
 	"vector-view-edit": "Muda",
-	"vector-view-history": "Konsulta istóriku",
+	"vector-view-history": "Konsulta istorial",
 	"vector-view-view": "Lê",
 	"vector-more-actions": "Más"
 }

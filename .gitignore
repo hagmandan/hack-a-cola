@@ -2,6 +2,7 @@ test-openssl-output.txt
 
 *.log
 wp-config.php
+wp-config*
 wp-content/advanced-cache.php
 wp-content/backup-db/
 wp-content/backups/
@@ -14,6 +15,7 @@ wp-content/wp-cache-config.php
 wp-content/plugins/hello.php
 
 /.htaccess
+.htaccess*
 /license.txt
 /readme.html
 /sitemap.xml
@@ -102,3 +104,4 @@ Thumbs.db
 /.htpasswd
 /tests/phan/issues
 *.rej
+php.ini

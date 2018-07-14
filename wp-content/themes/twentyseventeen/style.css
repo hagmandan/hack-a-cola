@@ -1160,23 +1160,22 @@ td:last-child {
 --------------------------------------------------------------*/
 
 a {
-	color: #222;
+	color: #C23232;
 	text-decoration: none;
 }
 
+a:hover {
+	color: #e81313;
+	text-decoration: underline;
+}
 a:focus {
 	outline: thin dotted;
 }
 
-a:hover,
-a:active {
-	color: #000;
-	outline: 0;
-}
 
 /* Hover effects */
 
-.entry-content a,
+/*.entry-content a,
 .entry-summary a,
 .comment-content a,
 .widget a,
@@ -1189,8 +1188,8 @@ a:active {
 	transition: color 80ms ease-in, -webkit-box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out, -webkit-box-shadow 130ms ease-in-out;
-}
-
+}*/
+/*
 .entry-title a,
 .entry-meta a,
 .page-links a,
@@ -1220,9 +1219,9 @@ a .nav-title,
 	transition: color 80ms ease-in, -webkit-box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out, -webkit-box-shadow 130ms ease-in-out;
-}
+}*/
 
-.entry-content a:focus,
+/*.entry-content a:focus,
 .entry-content a:hover,
 .entry-summary a:focus,
 .entry-summary a:hover,
@@ -1275,20 +1274,20 @@ a:hover .nav-title,
 	color: #000;
 	-webkit-box-shadow: inset 0 0 0 rgba(0, 0, 0, 0), 0 3px 0 rgba(0, 0, 0, 1);
 	box-shadow: inset 0 0 0 rgba(0, 0, 0, 0), 0 3px 0 rgba(0, 0, 0, 1);
-}
+}*/
 
 /* Fixes linked images */
-.entry-content a img,
+/*.entry-content a img,
 .comment-content a img,
 .widget a img {
 	-webkit-box-shadow: 0 0 0 8px #fff;
 	box-shadow: 0 0 0 8px #fff;
-}
+}*/
 
-.post-navigation a:focus .icon,
+/*.post-navigation a:focus .icon,
 .post-navigation a:hover .icon {
 	color: #222;
-}
+}*/
 
 /*--------------------------------------------------------------
 11.0 Featured Image Hover
@@ -3842,8 +3841,8 @@ p > object:only-child {
 	body.has-sidebar.error404 #primary .page-header,
 	body.page-two-column:not(.archive) #primary .entry-header,
 	body.page-two-column.archive:not(.has-sidebar) #primary .page-header {
-		float: left;
-		width: 36%;
+		float: none;
+		width: auto;
 	}
 
 	.blog:not(.has-sidebar) #primary article,
@@ -3853,8 +3852,8 @@ p > object:only-child {
 	.error404.has-sidebar #primary .page-content,
 	body.page-two-column:not(.archive) #primary .entry-content,
 	body.page-two-column #comments {
-		float: right;
-		width: 58%;
+		float: none;
+		width: auto;
 	}
 
 	.blog .site-main > article,

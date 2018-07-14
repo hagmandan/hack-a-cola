@@ -10,6 +10,12 @@
  * @version 1.0
  */
 
+	$vals = get_post_custom_values('wiki_link',$page->ID);
+	$wikiLink = $vals[0];
+
+	if (!empty($wikiLink)) {
+		echo do_shortcode('[rdp-wiki-embed url='.$wikiLink.']');
+	}
 ?>
 
 <article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>

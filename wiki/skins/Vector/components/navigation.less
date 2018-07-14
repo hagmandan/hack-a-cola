@@ -16,7 +16,7 @@
 	background-repeat: repeat-x;
 	/* This image is only a fallback (for IE 6-9), so we do not @embed it. */
 	background-image: url( images/page-fade.png );
-	.vertical-gradient( @body-background-color, @menu-background-color, 50%, 100% );
+	.vertical-gradient(@body-background-color, @menu-background-color, 50%, 100%);
 	background-color: @body-background-color;
 }
 
@@ -26,7 +26,7 @@
 	height: 5em;
 }
 
-#mw-head {
+div#mw-head {
 	position: absolute;
 	top: 0;
 	right: 0;
@@ -49,6 +49,8 @@
 	   is still broken, but at least the nav overlaps only the page title
 	   instead of half the content. */
 	margin-bottom: -2.5em;
+	/* IE 6 double-margin bug fix */
+	display: inline;
 }
 
 #right-navigation {
@@ -58,6 +60,9 @@
 
 /* Logo */
 #p-logo {
+	position: absolute;
+	top: -160px;
+	left: 0;
 	width: 10em;
 	height: 160px;
 
@@ -72,14 +77,15 @@
 }
 
 /* Panel */
-#mw-panel {
+div#mw-panel {
 	font-size: @menu-main-font-size;
 	position: absolute;
-	top: 0;
+	top: 160px;
+	padding-top: 1em;
 	width: 10em;
 	left: 0;
 
-	.portal {
+	div.portal {
 		margin: 0 0.6em 0 0.7em;
 		padding: 0.25em 0;
 		direction: ltr;
@@ -90,36 +96,36 @@
 			font-size: @menu-main-heading-font-size;
 			color: @menu-main-heading-color;
 			font-weight: normal;
-			margin: 0.5em 0 0 (@menu-main-body-margin-left/@menu-main-heading-font-size);
-			padding: 0.25em 0;
+			margin: 0.5em 0 0 0;
+			padding: @menu-main-heading-padding;
 			cursor: default;
 			border: 0;
 		}
 
-		.body {
-			margin-left: @menu-main-body-margin-left;
+		div.body {
+			margin: @menu-main-body-margin;
 			padding-top: 0;
 			.background-image( 'images/portal-break.png' );
 			background-repeat: no-repeat;
 
 			ul {
-				list-style: none none;
+				list-style-type: none;
+				list-style-image: none;
 				margin: 0;
 				padding: @menu-main-body-padding;
-			}
 
-			li {
-				line-height: 1.125em;
-				margin: 0;
-				padding: 0.25em 0;
-				font-size: @menu-main-body-font-size;
-				word-wrap: break-word;
+				li {
+					line-height: 1.125em;
+					margin: 0;
+					padding: 0.25em 0;
+					font-size: @menu-main-body-font-size;
+					word-wrap: break-word;
 
-				a {
-					color: @menu-main-body-link-color;
-
-					&:visited {
-						color: @menu-main-body-link-visited-color;
+					a {
+						color: @menu-main-body-link-color;
+						&:visited {
+							color: @menu-main-body-link-visited-color;
+						}
 					}
 				}
 			}
@@ -127,17 +133,15 @@
 	}
 
 	/* First sidebar portlet. Not using :first-of-type for IE<=8 support. */
-	#p-logo + .portal {
+	#p-logo + div.portal {
 		background-image: none;
-		margin-top: 1em;
-
+		margin-top: 0;
 		h3 {
 			display: none;
 		}
-
-		.body {
+		div.body {
 			background-image: none;
-			margin-left: @menu-main-body-margin-left;
+			margin-left: 0.5em;
 		}
 	}
 }

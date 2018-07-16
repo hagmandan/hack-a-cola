@@ -54,8 +54,8 @@ if(php_sapi_name() != 'cli' && !get_magic_quotes_gpc()) {
 $wgExtensionCredits['other'][] = array(
 	'path' => __FILE__,
 	'name' => 'WPMW',
-	'version' => '0.3.1',
-	'author' => 'Ciaran Gultnieks',
+	'version' => '0.3.1-hags',
+	'author' => 'Hags',
 	'url' => 'https://www.mediawiki.org/wiki/Extension:WPMW',
         'descriptionmsg' => 'Provides WordPress login integration',
 );
@@ -95,7 +95,7 @@ function AuthWPUserLoadFromSession($user, &$result) {
 	}
 	$user->setID($id);
 	$user->loadFromId();
-	wfSetupSession();	
+	wfSetupSession();
 	$user->setCookies();
 
 	// Set these to ensure synchronisation with WordPress...
@@ -118,7 +118,7 @@ function AuthWPUserLogout(&$user) {
 class AuthWP extends AuthPlugin {
 
 	// Constructor
-	function AuthWP(){
+	function __construct(){
 
 		// Add hooks...
 		global $wgHooks;
@@ -146,7 +146,7 @@ class AuthWP extends AuthPlugin {
 
 	// MediaWiki API HANDLER
 	// Modify the login template...
-	function modifyUITemplate(&$template) {
+	function modifyUITemplate(&$template, &$type) {
 		$template->set('create',false);
 		$template->set('usedomain',false);
 		$template->set('useemail',true);
@@ -210,7 +210,7 @@ class AuthWP extends AuthPlugin {
 
 	// MediaWiki API HANDLER
 	// Add a user created in MediaWiki to the Wordpress database...
-	function addUser($user,$password) {
+	function addUser( $user, $password, $email = '', $realname = '' ) {
 		wp_create_user($user->mName,$password,$user->mEmail);
 		return true;
 	}

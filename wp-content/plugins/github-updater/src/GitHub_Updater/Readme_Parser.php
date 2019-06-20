@@ -6,7 +6,7 @@
  * @license   GPL-2.0+
  * @link      https://github.com/afragen/github-updater
  * @package   github-updater
- * @uses      https://meta.trac.wordpress.org/browser/sites/trunk/wordpress.org/public_html/wp-content/plugins/plugin-directory/readme/class-parser.php
+ * @uses      https://meta.trac.wordpress.org/browser/sites/trunk/wordpress.org/public_html/wp-content/plugins/plugin-directory/readme
  */
 
 namespace Fragen\GitHub_Updater;
@@ -25,7 +25,43 @@ if ( ! defined( 'WPINC' ) ) {
  * Class Readme_Parser
  */
 class Readme_Parser extends Parser {
+
 	/**
+	 * Holds absolute filepath to temp readme file.
+	 *
+	 * @var string
+	 */
+	protected $readme_path;
+
+	/**
+	 * Constructor.
+	 *
+	 * Convert file contents string to temporary file.
+	 * Pass file path into class-parser.php.
+	 * Delete temporary file when finished.
+	 *
+	 * @param string $file
+	 *
+	 * @return void
+	 */
+	public function __construct( $file ) {
+		$file_path = trailingslashit( get_temp_dir() ) . md5( $file ) . '-tmp-readme.txt';
+
+		/**
+		 * Filter location of temporary readme filepath.
+		 *
+		 * @since 8.7.0
+		 *
+		 * @param string $file_path Absolute filepath to temp readme file.
+		 */
+		$this->readme_path = apply_filters( 'github_updater_temp_readme_filepath', $file_path );
+		$this->readme_path = file_put_contents( $this->readme_path, $file ) ? $this->readme_path : false;
+		parent::__construct( $this->readme_path );
+	}
+
+	/**
+	 * Parse text into markdown.
+	 *
 	 * @param string $text
 	 *
 	 * @return string
@@ -50,11 +86,18 @@ class Readme_Parser extends Parser {
 		foreach ( get_object_vars( $this ) as $key => $value ) {
 			$data[ $key ] = 'contributors' === $key ? $this->create_contributors( $value ) : $value;
 		}
+		$data = $this->faq_as_h4( $data );
+		$data = $this->readme_section_as_h4( 'changelog', $data );
+		$data = $this->readme_section_as_h4( 'description', $data );
+
+		@unlink( $this->readme_path );
 
 		return $data;
 	}
 
 	/**
+	 * Sanitize contributors.
+	 *
 	 * @param array $users
 	 *
 	 * @return array
@@ -77,7 +120,7 @@ class Readme_Parser extends Parser {
 			$contributors[ $contributor ]['display_name'] = $contributor;
 			$contributors[ $contributor ]['profile']      = '//profiles.wordpress.org/' . $contributor;
 			$contributors[ $contributor ]['avatar']       = 'https://wordpress.org/grav-redirect.php?user=' . $contributor;
-			if ( $wp_version < '5.0-alpha-42631' ) {
+			if ( version_compare( $wp_version, '5.1-alpha', '<' ) ) {
 				$contributors[ $contributor ] = '//profiles.wordpress.org/' . $contributor;
 			}
 		}
@@ -87,13 +130,42 @@ class Readme_Parser extends Parser {
 
 	/**
 	 * Converts FAQ from dictionary list to h4 style.
+	 *
+	 * @param array $data Array of parsed readme data.
+	 *
+	 * @return array $data
 	 */
-	protected function faq_as_h4() {
-		unset( $this->sections['faq'] );
-		$this->sections['faq'] = '';
-		foreach ( $this->faq as $question => $answer ) {
-			$this->sections['faq'] .= "<h4>{$question}</h4>\n{$answer}\n";
+	public function faq_as_h4( $data ) {
+		if ( empty( $data['faq'] ) ) {
+			return $data;
 		}
+		unset( $data['sections']['faq'] );
+		$data['sections']['faq'] = '';
+		foreach ( $data['faq'] as $question => $answer ) {
+			$data['sections']['faq'] .= "<h4>{$question}</h4>\n{$answer}\n";
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Converts wp.org readme section items to h4 style.
+	 *
+	 * @param string $section Readme section.
+	 * @param array  $data Array of parsed readme data.
+	 *
+	 * @return array $data
+	 */
+	public function readme_section_as_h4( $section, $data ) {
+		if ( empty( $data['sections'][ $section ] ) || false !== strpos( $data['sections'][ $section ], '<h4>' ) ) {
+			return $data;
+		}
+		$pattern = '~<p>=(.*)=</p>~';
+		$replace = '<h4>$1</h4>';
+
+		$data['sections'][ $section ] = preg_replace( $pattern, $replace, $data['sections'][ $section ] );
+
+		return $data;
 	}
 
 	/**

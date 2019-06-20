@@ -77,6 +77,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 			add_action( 'in_plugin_update_message-' . um_plugin, array( $this, 'in_plugin_update_message' ) );
 		}
 
+
 		/**
 		 * Function for major updates
 		 *
@@ -135,22 +136,36 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 
 
 		/**
+		 * @return array
+		 */
+		function get_extension_upgrades() {
+			$extensions = UM()->extensions()->get_list();
+			if ( empty( $extensions ) ) {
+				return array();
+			}
+
+			$upgrades = array();
+			foreach ( $extensions as $extension ) {
+				$upgrades[ $extension ] = UM()->extensions()->get_packages( $extension );
+			}
+
+			return $upgrades;
+		}
+
+
+		/**
 		 * Get array of necessary upgrade packages
 		 *
 		 * @return array
 		 */
 		function need_run_upgrades() {
-			$um_last_version_upgrade = get_option( 'um_last_version_upgrade' );
-			//first install
-			if ( ! $um_last_version_upgrade ) {
-				$um_last_version_upgrade = '1.3.88';
-			}
+			$um_last_version_upgrade = get_option( 'um_last_version_upgrade', '1.3.88' );
 
 			$diff_packages = array();
 
 			$all_packages = $this->get_packages();
 			foreach ( $all_packages as $package ) {
-				if ( version_compare( $um_last_version_upgrade, $package, '<' ) ) {
+				if ( version_compare( $um_last_version_upgrade, $package, '<' ) && version_compare( $package, ultimatemember_version, '<=' ) ) {
 					$diff_packages[] = $package;
 				}
 			}
@@ -260,7 +275,8 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 							type: 'POST',
 							dataType: 'json',
 							data: {
-								action: 'um_get_packages'
+								action: 'um_get_packages',
+								nonce: um_admin_scripts.nonce
 							},
 							success: function( response ) {
 								um_packages = response.data.packages;
@@ -290,7 +306,8 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 							dataType: 'html',
 							data: {
 								action: 'um_run_package',
-								pack: pack
+								pack: pack,
+								nonce: um_admin_scripts.nonce
 							},
 							success: function( html ) {
 								um_add_upgrade_log( 'Package "' + pack + '" is ready. Start the execution...' );
@@ -334,6 +351,8 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 
 
 		function ajax_run_package() {
+			UM()->admin()->check_ajax_nonce();
+
 			if ( empty( $_POST['pack'] ) ) {
 				exit('');
 			} else {
@@ -346,39 +365,11 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 
 
 		function ajax_get_packages() {
+			UM()->admin()->check_ajax_nonce();
+
 			$update_versions = $this->need_run_upgrades();
 			wp_send_json_success( array( 'packages' => $update_versions ) );
 		}
-
-		/**
-		 * Load packages
-		 */
-		/*public function packages() {
-			if ( ! ini_get( 'safe_mode' ) ) {
-				@set_time_limit(0);
-			}
-
-			$this->set_update_versions();
-
-			$um_last_version_upgrade = get_option( 'um_last_version_upgrade' );
-			$um_last_version_upgrade = ! $um_last_version_upgrade ? '0.0.0' : $um_last_version_upgrade;
-
-			foreach ( $this->update_versions as $update_version ) {
-
-				if ( version_compare( $update_version, $um_last_version_upgrade, '<=' ) )
-					continue;
-
-				if ( version_compare( $update_version, ultimatemember_version, '>' ) )
-					continue;
-
-				$file_path = $this->packages_dir . $update_version . '.php';
-
-				if ( file_exists( $file_path ) ) {
-					include_once( $file_path );
-					update_option( 'um_last_version_upgrade', $update_version );
-				}
-			}
-		}*/
 
 
 		/**
@@ -402,28 +393,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Upgrade' ) ) {
 
 
 
-		/**
-		 * Parse packages dir for packages files
-		 */
-		/*function set_update_versions_() {
-			$update_versions = array();
-			$handle = opendir( $this->packages_dir );
-			if ( $handle ) {
-				while ( false !== ( $filename = readdir( $handle ) ) ) {
-					if ( $filename != '.' && $filename != '..' ) {
-						var_dump( $filename );
-						if ( is_dir( $this->packages_dir . DIRECTORY_SEPARATOR . $filename ) ) {
-							$update_versions[] = $filename;
-						}
-					}
-				}
-				closedir( $handle );
 
-				usort( $update_versions, array( &$this, 'version_compare_sort' ) );
-
-				$this->update_packages = $update_versions;
-			}
-		}*/
 
 
 		/**

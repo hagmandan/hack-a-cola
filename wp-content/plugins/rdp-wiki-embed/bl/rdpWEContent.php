@@ -48,6 +48,7 @@ class RDP_WIKI_EMBED_CONTENT {
     } 
     
     public function fetch() {
+    
         global $wpdb;
         $wpdb->suppress_errors();
         $wpdb->show_errors(false);        
@@ -72,14 +73,14 @@ class RDP_WIKI_EMBED_CONTENT {
     private function preRender() {
         if($this->_hasError){
             $label = __('ERROR', 'rdp-wiki-embed');
-            $msg = sprintf('<span></span> %s: %s', $label, $this->_lastMessage);
+            $msg = sprintf('<span class="notice-icon"></span> %s: %s', $label, $this->_lastMessage);
             $this->_content = RDP_WIKI_EMBED_UTILITIES::showMessage($msg, true, false);
             return;
         }
         
         $permalink = get_the_permalink();
         $html = new rdp_simple_html_dom();
-        $html->load('<html>'.$this->_contentRaw.'</html>');
+        $html->load('<html>'.$this->_contentRaw.'</html>',true,false);
         
         $remove_elements = explode( ",", $this->remove );
         if(empty($this->_options['edit_show'])){
@@ -128,6 +129,8 @@ class RDP_WIKI_EMBED_CONTENT {
         }
 
         $len = strlen($this->_rootSource);
+        
+        $white_list_urls = preg_split( '/\r\n|\r|\n/', $this->_options['whitelist'] );
 
         foreach($html->find('a') as $link){
             $fIsExternal = false;
@@ -144,9 +147,19 @@ class RDP_WIKI_EMBED_CONTENT {
             }
 
             if(isset($link->href)){
-                if(!$fIsExternal):
-                    $pos = (substr(strtolower($link->href), 0, $len) === $this->_rootSource);
-                    $fIsExternal = !($pos === true);                   
+                 if(!$fIsExternal):
+                    
+                    $href = $link->href;
+                    foreach ($white_list_urls as $value) {
+                        $pos = strpos($href,$value);
+                        if ($pos !== false){
+                            $fIsExternal = false;
+                            break;
+                        }
+                    }
+
+//                    $pos = (substr(strtolower($link->href), 0, $len) === $this->_rootSource);
+//                    $fIsExternal = !($pos === true);                   
                 endif;
 
                 if($fIsExternal)$link->rel = 'external_link'; 
@@ -218,7 +231,7 @@ class RDP_WIKI_EMBED_CONTENT {
             $element->id = 'rdp-we-' . $element->id;
         }               
         
-        $this->_content = $html->find('body',0)->innertext;        
+        $this->_content = $html->find('body',0)->innertext; 
     }//preRender
     
     private function scrub(&$body) {
@@ -237,7 +250,8 @@ class RDP_WIKI_EMBED_CONTENT {
             '.mw-indicators',
             'form.header',
             '#page-actions',
-            'math'
+            'math',
+            '.mw-jump-link',
         );
         
         
@@ -348,7 +362,7 @@ class RDP_WIKI_EMBED_CONTENT {
     }//content_scrub
     
     private function content_get(&$wpdb,$table) {
-        
+
         $curl = curl_init();
         // Make the request
         curl_setopt($curl, CURLOPT_URL, $this->url );
@@ -371,7 +385,7 @@ class RDP_WIKI_EMBED_CONTENT {
         curl_close($curl);
 
         $html = new rdp_simple_html_dom();
-        $html->load($response);
+        $html->load($response,true,false);
         //$html = new rdp_simple_html_dom($response); // Create new parser instance        
 
         if(!$html){
@@ -390,7 +404,8 @@ class RDP_WIKI_EMBED_CONTENT {
         }
      
         $this->scrub($body);
-        $this->_contentRaw = $body->outertext;        
+        $this->_contentRaw = $body->outertext;   
+
         $options = get_option( RDP_WIKI_EMBED_PLUGIN::$options_name );
         if(!is_array($options)){
             $options = RDP_WIKI_EMBED_PLUGIN::default_settings();

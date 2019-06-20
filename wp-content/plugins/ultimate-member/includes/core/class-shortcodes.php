@@ -26,6 +26,11 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 
 			add_shortcode( 'ultimatemember', array( &$this, 'ultimatemember' ) );
 
+			add_shortcode( 'ultimatemember_login', array( &$this, 'ultimatemember_login' ) );
+			add_shortcode( 'ultimatemember_register', array( &$this, 'ultimatemember_register' ) );
+			add_shortcode( 'ultimatemember_profile', array( &$this, 'ultimatemember_profile' ) );
+			add_shortcode( 'ultimatemember_directory', array( &$this, 'ultimatemember_directory' ) );
+
 			add_shortcode( 'um_loggedin', array( &$this, 'um_loggedin' ) );
 			add_shortcode( 'um_loggedout', array( &$this, 'um_loggedout' ) );
 			add_shortcode( 'um_show_content', array( &$this, 'um_shortcode_show_content_for_role' ) );
@@ -260,24 +265,23 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 
 			if ( isset( $this->set_args ) && is_array( $this->set_args ) ) {
 				$args = $this->set_args;
-                
+
 				unset( $args['file'] );
 				unset( $args['theme_file'] );
 				unset( $args['tpl'] );
+
+				$args = apply_filters( 'um_template_load_args', $args, $tpl );
 
 				extract( $args );
 			}
 
 			$file = um_path . "templates/{$tpl}.php";
 			$theme_file = get_stylesheet_directory() . "/ultimate-member/templates/{$tpl}.php";
-
-
 			if ( file_exists( $theme_file ) ) {
 				$file = $theme_file;
 			}
 
 			if ( file_exists( $file ) ) {
-
 				include $file;
 			}
 		}
@@ -359,12 +363,13 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 
 			$args = wp_parse_args( $args, $defaults );
 
-			$args['lock_text'] = $this->convert_locker_tags( $args['lock_text'] );
+
 
 			if ( ! is_user_logged_in() ) {
 				if ( $args['show_lock'] == 'no' ) {
 					echo '';
 				} else {
+					$args['lock_text'] = $this->convert_locker_tags( $args['lock_text'] );
 					$this->set_args = $args;
 					$this->load_template( 'login-to-view' );
 				}
@@ -376,22 +381,145 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			return $output;
 		}
 
-		/***
-		 ***	@Logged-out only content
+
+		/**
+		 * Logged-out only content
+		 *
+		 * @param array $args
+		 * @param string $content
+		 *
+		 * @return string
 		 */
 		function um_loggedout($args = array(), $content = "") {
 			ob_start();
 
 			// Hide for logged in users
-			if (is_user_logged_in()) {
+			if ( is_user_logged_in() ) {
 				echo '';
 			} else {
-				echo do_shortcode(wpautop($content));
+				echo do_shortcode( wpautop( $content ) );
 			}
 
-			$output = ob_get_contents();
-			ob_end_clean();
+			$output = ob_get_clean();
 			return $output;
+		}
+
+
+		/**
+		 * @param array $args
+		 *
+		 * @return string
+		 */
+		function ultimatemember_login( $args = array() ) {
+			global $wpdb;
+
+			$args = ! empty( $args ) ? $args : array();
+
+			$default_login = $wpdb->get_var(
+				"SELECT pm.post_id 
+				FROM {$wpdb->postmeta} pm 
+				LEFT JOIN {$wpdb->postmeta} pm2 ON( pm.post_id = pm2.post_id AND pm2.meta_key = '_um_is_default' )
+				WHERE pm.meta_key = '_um_mode' AND 
+					  pm.meta_value = 'login' AND 
+					  pm2.meta_value = '1'"
+			);
+
+			$args['form_id'] = $default_login;
+			$shortcode_attrs = '';
+			foreach ( $args as $key => $value ) {
+				$shortcode_attrs .= " {$key}=\"{$value}\"";
+			}
+
+			return do_shortcode( "[ultimatemember {$shortcode_attrs} /]" );
+		}
+
+
+		/**
+		 * @param array $args
+		 *
+		 * @return string
+		 */
+		function ultimatemember_register( $args = array() ) {
+			global $wpdb;
+
+			$args = ! empty( $args ) ? $args : array();
+
+			$default_register = $wpdb->get_var(
+				"SELECT pm.post_id 
+				FROM {$wpdb->postmeta} pm 
+				LEFT JOIN {$wpdb->postmeta} pm2 ON( pm.post_id = pm2.post_id AND pm2.meta_key = '_um_is_default' )
+				WHERE pm.meta_key = '_um_mode' AND 
+					  pm.meta_value = 'register' AND 
+					  pm2.meta_value = '1'"
+			);
+
+			$args['form_id'] = $default_register;
+			$shortcode_attrs = '';
+			foreach ( $args as $key => $value ) {
+				$shortcode_attrs .= " {$key}=\"{$value}\"";
+			}
+
+			return do_shortcode( "[ultimatemember {$shortcode_attrs} /]" );
+		}
+
+
+		/**
+		 * @param array $args
+		 *
+		 * @return string
+		 */
+		function ultimatemember_profile( $args = array() ) {
+			global $wpdb;
+
+			$args = ! empty( $args ) ? $args : array();
+
+			$default_profile = $wpdb->get_var(
+				"SELECT pm.post_id 
+				FROM {$wpdb->postmeta} pm 
+				LEFT JOIN {$wpdb->postmeta} pm2 ON( pm.post_id = pm2.post_id AND pm2.meta_key = '_um_is_default' )
+				WHERE pm.meta_key = '_um_mode' AND 
+					  pm.meta_value = 'profile' AND 
+					  pm2.meta_value = '1'"
+			);
+
+			$args['form_id'] = $default_profile;
+
+			$shortcode_attrs = '';
+			foreach ( $args as $key => $value ) {
+				$shortcode_attrs .= " {$key}=\"{$value}\"";
+			}
+
+			return do_shortcode( "[ultimatemember {$shortcode_attrs} /]" );
+		}
+
+
+		/**
+		 * @param array $args
+		 *
+		 * @return string
+		 */
+		function ultimatemember_directory( $args = array() ) {
+			global $wpdb;
+
+			$args = ! empty( $args ) ? $args : array();
+
+			$default_directory = $wpdb->get_var(
+				"SELECT pm.post_id 
+				FROM {$wpdb->postmeta} pm 
+				LEFT JOIN {$wpdb->postmeta} pm2 ON( pm.post_id = pm2.post_id AND pm2.meta_key = '_um_is_default' )
+				WHERE pm.meta_key = '_um_mode' AND 
+					  pm.meta_value = 'directory' AND 
+					  pm2.meta_value = '1'"
+			);
+
+			$args['form_id'] = $default_directory;
+
+			$shortcode_attrs = '';
+			foreach ( $args as $key => $value ) {
+				$shortcode_attrs .= " {$key}=\"{$value}\"";
+			}
+
+			return do_shortcode( "[ultimatemember {$shortcode_attrs} /]" );
 		}
 
 
@@ -415,8 +543,6 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 		 * @return string
 		 */
 		function load( $args ) {
-			ob_start();
-
 			$defaults = array();
 			$args = wp_parse_args($args, $defaults);
 
@@ -432,7 +558,9 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			}
 
 			// get data into one global array
-			$post_data = UM()->query()->post_data($this->form_id);
+			$post_data = UM()->query()->post_data( $this->form_id );
+
+			ob_start();
 
 			/**
 			 * UM hook
@@ -457,27 +585,26 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			 */
 			$args = apply_filters( 'um_pre_args_setup', $post_data );
 
-			if (!isset($args['template'])) {
+			if ( ! isset( $args['template'] ) ) {
 				$args['template'] = '';
 			}
 
-			if (isset($post_data['template']) && $post_data['template'] != $args['template']) {
+			if ( isset( $post_data['template'] ) && $post_data['template'] != $args['template'] ) {
 				$args['template'] = $post_data['template'];
 			}
 
-			if (!$this->template_exists($args['template'])) {
+			if ( ! $this->template_exists( $args['template'] ) ) {
 				$args['template'] = $post_data['mode'];
 			}
 
-			if (!isset($post_data['template'])) {
+			if ( ! isset( $post_data['template'] ) ) {
 				$post_data['template'] = $post_data['mode'];
 			}
 
-			if( 'directory' != $args['mode'] ) {
-
+			if ( 'directory' != $args['mode'] ) {
 				$args = array_merge( $post_data, $args );
 
-				if (empty( $args['use_custom_settings'] )) {
+				if ( empty( $args['use_custom_settings'] ) ) {
 					$args = array_merge( $args, $this->get_css_args( $args ) );
 				} else {
 					$args = array_merge( $this->get_css_args( $args ), $args );
@@ -508,29 +635,40 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			 */
 			$args = apply_filters( 'um_shortcode_args_filter', $args );
 
-			extract($args, EXTR_SKIP);
+			/**
+			 * @var string $mode
+			 */
+			extract( $args, EXTR_SKIP );
 
 			//not display on admin preview
 			if ( empty( $_POST['act_id'] ) || $_POST['act_id'] != 'um_admin_preview_form' ) {
 				if ( 'register' == $mode && is_user_logged_in() ) {
+					ob_get_clean();
 					return __( 'You are already registered', 'ultimate-member' );
 				}
 			}
 
 			// for profiles only
 			if ( $mode == 'profile' && um_profile_id() ) {
-				$use_custom = get_post_meta( $this->form_id, "_um_{$mode}_use_custom_settings", true );
-				if ( $use_custom ) { // Custom Form settings
+
+				//set requested user if it's not setup from permalinks (for not profile page in edit mode)
+				if ( ! um_get_requested_user() ) {
+					um_set_requested_user( um_profile_id() );
+				}
+
+				if ( ! empty( $args['use_custom_settings'] ) ) { // Custom Form settings
 					$current_user_roles = UM()->roles()->get_all_user_roles( um_profile_id() );
 
 					//backward compatibility between single/multi role form's setting
 					if ( ! empty( $args['role'] ) ) {
 						if ( is_array( $args['role'] ) ) {
 							if ( ! count( array_intersect( $args['role'], $current_user_roles ) ) ) {
+								ob_get_clean();
 								return '';
 							}
 						} else {
 							if ( ! in_array( $args['role'], $current_user_roles ) ) {
+								ob_get_clean();
 								return '';
 							}
 						}
@@ -626,8 +764,7 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			 */
 			do_action( 'um_after_everything_output' );
 
-			$output = ob_get_contents();
-			ob_end_clean();
+			$output = ob_get_clean();
 			return $output;
 		}
 
@@ -813,7 +950,36 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 		 * @return string
 		 */
 		function get_shortcode( $post_id ) {
-			$shortcode = '[ultimatemember form_id=' . $post_id . ']';
+			$shortcode = '[ultimatemember form_id="' . $post_id . '"]';
+			return $shortcode;
+		}
+
+
+		/**
+		 * Get Shortcode for given form ID
+		 *
+		 * @param $post_id
+		 *
+		 * @return string
+		 */
+		function get_default_shortcode( $post_id ) {
+			$mode = UM()->query()->get_attr( 'mode', $post_id );
+
+			switch ( $mode ) {
+				case 'login':
+					$shortcode = '[ultimatemember_login]';
+					break;
+				case 'profile':
+					$shortcode = '[ultimatemember_profile]';
+					break;
+				case 'register':
+					$shortcode = '[ultimatemember_register]';
+					break;
+				case 'directory':
+					$shortcode = '[ultimatemember_directory]';
+					break;
+			}
+
 			return $shortcode;
 		}
 
@@ -826,6 +992,8 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 		 * @return mixed|string
 		 */
 		function convert_locker_tags( $str ) {
+			add_filter( 'um_template_tags_patterns_hook', array( &$this, 'add_placeholder' ), 10, 1 );
+			add_filter( 'um_template_tags_replaces_hook', array( &$this, 'add_replace_placeholder' ), 10, 1 );
 			return um_convert_tags( $str, array(), false );
 		}
 
@@ -845,6 +1013,7 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 				'{display_name}',
 				'{user_avatar_small}',
 				'{username}',
+				'{nickname}',
 			);
 
 			/**
@@ -888,6 +1057,10 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 
 						if ( $usermeta == 'username' ) {
 							$value = um_user( 'user_login' );
+						}
+
+						if ( $usermeta == 'nickname' ) {
+							$value = um_profile( 'nickname' );
 						}
 
 						/**
@@ -996,12 +1169,35 @@ if ( ! class_exists( 'um\core\Shortcodes' ) ) {
 			$this->load_template( 'searchform' );
 
 			// get the buffer
-			$template = ob_get_contents();
-
-			// clear the buffer
-			ob_end_clean();
+			$template = ob_get_clean();
 
 			return $template;
+		}
+
+
+		/**
+		 * UM Placeholders for login referrer
+		 *
+		 * @param $placeholders
+		 *
+		 * @return array
+		 */
+		function add_placeholder( $placeholders ) {
+			$placeholders[] = '{login_referrer}';
+			return $placeholders;
+		}
+
+
+		/**
+		 * UM Replace Placeholders for login referrer
+		 *
+		 * @param $replace_placeholders
+		 *
+		 * @return array
+		 */
+		function add_replace_placeholder( $replace_placeholders ) {
+			$replace_placeholders[] = um_dynamic_login_page_redirect();
+			return $replace_placeholders;
 		}
 
 	}

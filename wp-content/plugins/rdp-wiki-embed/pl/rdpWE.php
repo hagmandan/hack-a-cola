@@ -15,7 +15,6 @@ class RDP_WIKI_EMBED {
             if ($newvalue === "false") $newvalue = false;
             $this->$key = $newvalue;
         } 
-
         $this->_version = $version;
     }//__construct
     
@@ -66,9 +65,6 @@ class RDP_WIKI_EMBED {
         if(!is_numeric($attrs['admin_nav_show']))$attrs['admin_nav_show'] = $this->_default_settings['admin_nav_show'];         
         if(!is_numeric($attrs['footer_show']))$attrs['footer_show'] = $this->_default_settings['footer_show'];         
         if(!in_array( $attrs['wiki_links'], RDP_WIKI_EMBED_PLUGIN::link_settings() ))$attrs['wiki_links'] = $this->_default_settings['wiki_links'];          
-
-        
-        
         
         // add shortcode attrs as class-level properties
         foreach ($attrs as $key => $value ) {
@@ -81,9 +77,9 @@ class RDP_WIKI_EMBED {
                 $this->$key = $newvalue;
             endif;
         }  
-      
 
-        $props = get_object_vars($this);        
+        $props = get_object_vars($this);      
+
         $oRDP_WIKI_EMBED_CONTENT = new RDP_WIKI_EMBED_CONTENT($props);
         $sHTML = sprintf('<div id="rdp-we-main" data-resource="%s">', esc_attr($attrs['url']) );
         $sHTML .= $oRDP_WIKI_EMBED_CONTENT->fetch();
@@ -95,6 +91,7 @@ class RDP_WIKI_EMBED {
         
         // call enqueueScripts to make sure shortcode atts take affect
         $this->enqueueScripts();
+        
         return $sHTML;
     }//shortcode  
     
@@ -172,8 +169,11 @@ class RDP_WIKI_EMBED {
         // global wiki content replace
         // clear enqueued script to make sure any overriding shortcode atts take affect
         if (wp_script_is('rdp-we-wcr')) {
-            wp_dequeue_script('rdp-we-wcr');
+            wp_deregister_script( 'rdp-we-wcr' );
         }
+        
+        global $wp_scripts;
+        
         $fOverwrite = ($this->_options['wiki_links'] === 'overwrite');
         $fGlobalCR = (isset($this->_options['global_content_replace']))? intval($this->_options['global_content_replace']) : 0;
         $text_string = empty($this->_options['whitelist'])? '' : $this->_options['whitelist'];
@@ -214,9 +214,9 @@ class RDP_WIKI_EMBED {
     public function contentFilter($content) {
         if(empty($this->_resource))return $content;
         $attrs = self::parseShortcodeAttrs($content);
-        $attrs['url'] = $this->_resource;
-        remove_filter( 'the_content', array( $this, 'contentFilter' ) );               
-
+        $attrs['url'] = $this->_resource;             
+        //remove_all_filters( 'the_content' );
+        
         /* Return the content. */
         return $this->shortcode($attrs);        
     }//contentFilter

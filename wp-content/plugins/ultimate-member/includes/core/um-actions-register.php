@@ -55,10 +55,10 @@ function um_after_insert_user( $user_id, $args ) {
 	UM()->user()->remove_cached_queue();
 
 	um_fetch_user( $user_id );
-	UM()->user()->set_status( um_user( 'status' ) );
 	if ( ! empty( $args['submitted'] ) ) {
-		UM()->user()->set_registration_details( $args['submitted'] );
+		UM()->user()->set_registration_details( $args['submitted'], $args );
 	}
+    UM()->user()->set_status( um_user( 'status' ) );
 
 	/**
 	 * UM hook
@@ -309,9 +309,13 @@ function um_submit_form_register( $args ) {
 
 		// if full name exists
 		$count = 1;
-		while ( username_exists( $user_login ) ) {
-			$user_login .= $count;
+		$temp_user_login = $user_login;
+		while ( username_exists( $temp_user_login ) ) {
+			$temp_user_login = $user_login . $count;
 			$count++;
+		}
+		if ( $temp_user_login !== $user_login ) {
+			$user_login = $temp_user_login;
 		}
 	}
 
@@ -453,51 +457,6 @@ add_action( 'um_submit_form_register', 'um_submit_form_register', 10 );
 
 
 /**
- * Register user with predefined role in options
- *
- * @param $args
- */
-function um_add_user_role( $args ) {
-
-	if ( isset( $args['custom_fields']['role_select'] ) || isset( $args['custom_fields']['role_radio'] ) ) return;
-
-	$use_custom_settings = get_post_meta( $args['form_id'], '_um_register_use_custom_settings', true );
-
-	$role = apply_filters( 'um_registration_user_role', UM()->form()->assigned_role( UM()->form()->form_id ), $args );
-
-	if ( empty( $use_custom_settings ) || empty( $role ) ) return;
-
-	/**
-	 * UM hook
-	 *
-	 * @type filter
-	 * @title um_register_hidden_role_field
-	 * @description Display hidden role field
-	 * @input_vars
-	 * [{"var":"$role","type":"string","desc":"Hidden user role"}]
-	 * @change_log
-	 * ["Since: 2.0"]
-	 * @usage
-	 * <?php add_filter( 'um_register_hidden_role_field', 'function_name', 10, 1 ); ?>
-	 * @example
-	 * <?php
-	 * add_filter( 'um_register_hidden_role_field', 'my_register_hidden_role_field', 10, 1 );
-	 * function my_register_hidden_role_field( $role ) {
-	 *     // your code here
-	 *     return $role;
-	 * }
-	 * ?>
-	 */
-	$role = apply_filters( 'um_register_hidden_role_field', $role );
-	if ( $role ) {
-		echo '<input type="hidden" name="role" id="role" value="' . $role . '" />';
-	}
-
-}
-//add_action( 'um_after_register_fields', 'um_add_user_role', 10, 1 );
-
-
-/**
  * Show the submit button
  *
  * @param $args
@@ -554,7 +513,7 @@ function um_add_submit_button_to_register( $args ) {
 	 * }
 	 * ?>
 	 */
-	$secondary_btn_word = apply_filters('um_register_form_button_two', $secondary_btn_word, $args );
+	$secondary_btn_word = apply_filters( 'um_register_form_button_two', $secondary_btn_word, $args );
 
 	$secondary_btn_url = ( isset( $args['secondary_btn_url'] ) && $args['secondary_btn_url'] ) ? $args['secondary_btn_url'] : um_get_core_page('login');
 	/**
@@ -583,14 +542,22 @@ function um_add_submit_button_to_register( $args ) {
 
 	<div class="um-col-alt">
 
-		<?php if ( isset($args['secondary_btn']) && $args['secondary_btn'] != 0 ) { ?>
+		<?php if ( isset( $args['secondary_btn'] ) && $args['secondary_btn'] != 0 ) { ?>
 
-			<div class="um-left um-half"><input type="submit" value="<?php echo __( $primary_btn_word,'ultimate-member'); ?>" class="um-button" id="um-submit-btn" /></div>
-			<div class="um-right um-half"><a href="<?php echo $secondary_btn_url; ?>" class="um-button um-alt"><?php echo __( $secondary_btn_word,'ultimate-member'); ?></a></div>
+			<div class="um-left um-half">
+				<input type="submit" value="<?php esc_attr_e( wp_unslash( $primary_btn_word ), 'ultimate-member' ) ?>" class="um-button" id="um-submit-btn" />
+			</div>
+			<div class="um-right um-half">
+				<a href="<?php echo esc_attr( $secondary_btn_url ); ?>" class="um-button um-alt">
+					<?php _e( wp_unslash( $secondary_btn_word ),'ultimate-member' ); ?>
+				</a>
+			</div>
 
 		<?php } else { ?>
 
-			<div class="um-center"><input type="submit" value="<?php echo __( $primary_btn_word,'ultimate-member'); ?>" class="um-button" id="um-submit-btn" /></div>
+			<div class="um-center">
+				<input type="submit" value="<?php esc_attr_e( wp_unslash( $primary_btn_word ), 'ultimate-member' ) ?>" class="um-button" id="um-submit-btn" />
+			</div>
 
 		<?php } ?>
 
@@ -622,8 +589,9 @@ add_action( 'um_main_register_fields', 'um_add_register_fields', 100 );
  */
 function um_registration_save_files( $user_id, $args ) {
 
-	if ( empty( $args['custom_fields'] ) )
+	if ( empty( $args['custom_fields'] ) ) {
 		return;
+	}
 
 	$files = array();
 
@@ -634,13 +602,13 @@ function um_registration_save_files( $user_id, $args ) {
 
 		foreach ( $fields as $key => $array ) {
 
-			if ( isset( $args['submitted'][$key] ) ) {
+			if ( isset( $args['submitted'][ $key ] ) ) {
 
-				if ( isset( $fields[$key]['type'] ) && in_array( $fields[$key]['type'], array( 'image', 'file' ) ) &&
-				     ( um_is_temp_upload( $args['submitted'][$key] ) || $args['submitted'][$key] == 'empty_file' )
+				if ( isset( $fields[ $key ]['type'] ) && in_array( $fields[ $key ]['type'], array( 'image', 'file' ) ) &&
+				     ( um_is_temp_file( $args['submitted'][ $key ] ) || $args['submitted'][ $key ] == 'empty_file' )
 				) {
 
-					$files[$key] = $args['submitted'][$key];
+					$files[ $key ] = $args['submitted'][ $key ];
 
 				}
 			}
@@ -670,50 +638,10 @@ function um_registration_save_files( $user_id, $args ) {
 	 */
 	$files = apply_filters( 'um_user_pre_updating_files_array', $files );
 
-	if ( !empty( $files ) ) {
-		/**
-		 * UM hook
-		 *
-		 * @type action
-		 * @title um_before_user_upload
-		 * @description Before file uploaded on complete UM user registration.
-		 * @input_vars
-		 * [{"var":"$user_id","type":"int","desc":"User ID"},
-		 * {"var":"$files","type":"array","desc":"Files data"}]
-		 * @change_log
-		 * ["Since: 2.0"]
-		 * @usage add_action( 'um_before_user_upload', 'function_name', 10, 2 );
-		 * @example
-		 * <?php
-		 * add_action( 'um_before_user_upload', 'my_before_user_upload', 10, 2 );
-		 * function my_before_user_upload( $user_id, $files ) {
-		 *     // your code here
-		 * }
-		 * ?>
-		 */
-		do_action( 'um_before_user_upload', $user_id, $files );
-		UM()->user()->update_files( $files );
-		/**
-		 * UM hook
-		 *
-		 * @type action
-		 * @title um_after_user_upload
-		 * @description After complete UM user registration and file uploaded.
-		 * @input_vars
-		 * [{"var":"$user_id","type":"int","desc":"User ID"},
-		 * {"var":"$files","type":"array","desc":"Files data"}]
-		 * @change_log
-		 * ["Since: 2.0"]
-		 * @usage add_action( 'um_after_user_upload', 'function_name', 10, 2 );
-		 * @example
-		 * <?php
-		 * add_action( 'um_after_user_upload', 'my_after_user_upload', 10, 2 );
-		 * function my_after_user_upload( $user_id, $files ) {
-		 *     // your code here
-		 * }
-		 * ?>
-		 */
-		do_action( 'um_after_user_upload', $user_id, $files );
+	if ( ! empty( $files ) ) {
+		UM()->uploader()->replace_upload_dir = true;
+		UM()->uploader()->move_temporary_files( $user_id, $files );
+		UM()->uploader()->replace_upload_dir = false;
 	}
 }
 add_action( 'um_registration_set_extra_data', 'um_registration_save_files', 10, 2 );

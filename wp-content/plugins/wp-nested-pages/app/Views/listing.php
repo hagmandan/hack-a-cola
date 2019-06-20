@@ -1,24 +1,31 @@
 <?php
 $wpml_pages = ( $this->integrations->plugins->wpml->installed && $this->integrations->plugins->wpml->isDefaultLanguage()) ? true : false;
 if ( !$this->integrations->plugins->wpml->installed ) $wpml_pages = true;
+$dark_mode = ( $this->integrations->plugins->dark_mode->installed ) ? true : false;
+if ( $dark_mode ) :
+	$dark_meta = get_user_meta(get_current_user_id(), 'dark_mode', true);
+	if ( $dark_meta !== 'on' ) $dark_mode = false;
+endif;
 ?>
-<div class="wrap nestedpages">
+<div class="wrap nestedpages <?php if ( $dark_mode ) echo 'np-dark-mode'; ?>">
 	<div class="nestedpages-listing-title">
 		<h1 class="wp-heading-inline">
 			<?php esc_html_e($this->post_type->labels->name); ?>
 		</h1>
-			
+		
+		<?php if ( $this->user->canPublish($this->post_type->name) ) :  ?>
 		<a href="<?php echo $this->post_type_repo->addNewPostLink($this->post_type->name); ?>" class="page-title-action">
 			<?php esc_html_e($this->post_type->labels->add_new); ?>
 		</a>
+		<?php endif; ?>
 
-		<?php if ( current_user_can('publish_pages') && !$this->listing_repo->isSearch() && $wpml_pages ) : ?>
+		<?php if ( $this->user->canPublish($this->post_type->name) && !$this->listing_repo->isSearch() && $wpml_pages ) : ?>
 		<a href="#" class="open-bulk-modal page-title-action" title="<?php _e('Add Multiple', 'wp-nested-pages'); ?>" data-parentid="0" data-nestedpages-modal-toggle="np-bulk-modal">
 			<?php esc_html_e('Add Multiple', 'wp-nested-pages'); ?>
 		</a>
 		<?php endif; ?>
 		
-		<?php if ( current_user_can('publish_pages') && $this->post_type->name == 'page' && !$this->listing_repo->isSearch() && !$this->listing_repo->isOrdered($this->post_type->name) && !$this->settings->menusDisabled() && !$this->integrations->plugins->wpml->installed ) : ?>
+		<?php if ( $this->user->canPublish($this->post_type->name) && $this->post_type->name == 'page' && !$this->listing_repo->isSearch() && !$this->listing_repo->isOrdered($this->post_type->name) && !$this->settings->menusDisabled() && !$this->integrations->plugins->wpml->installed ) : ?>
 		<a href="#" class="open-redirect-modal page-title-action" title="<?php _e('Add Link', 'wp-nested-pages'); ?>" data-parentid="0">
 			<?php esc_html_e('Add Link', 'wp-nested-pages'); ?>
 		</a>
@@ -92,13 +99,13 @@ if ( !$this->integrations->plugins->wpml->installed ) $wpml_pages = true;
 			<?php include( NestedPages\Helpers::view('forms/quickedit-post') ); ?>
 		</div>
 
-		<?php if ( current_user_can('publish_pages') && !$this->integrations->plugins->wpml->installed ) : ?>
+		<?php if ( $this->user->canPublish($this->post_type->name) && !$this->integrations->plugins->wpml->installed ) : ?>
 		<div class="quick-edit quick-edit-form-redirect np-inline-modal" style="display:none;">
 			<?php include( NestedPages\Helpers::view('forms/quickedit-link') ); ?>
 		</div>
 		<?php endif; ?>
 
-		<?php if ( current_user_can('publish_pages') ) : ?>
+		<?php if ( $this->user->canPublish($this->post_type->name) ) : ?>
 		<div class="new-child new-child-form np-inline-modal" style="display:none;">
 			<?php include( NestedPages\Helpers::view('forms/new-child') ); ?>
 		</div>

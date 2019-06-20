@@ -3,7 +3,6 @@
  * GitHub Updater
  *
  * @author    Andy Fragen
- * @author    Gary Jones
  * @license   GPL-2.0+
  * @link      https://github.com/afragen/github-updater
  * @package   github-updater
@@ -30,7 +29,6 @@ if ( ! defined( 'WPINC' ) ) {
  * Update a WordPress plugin or theme from a Git-based repo.
  *
  * @author  Andy Fragen
- * @author  Gary Jones
  */
 class Base {
 	use GHU_Trait, Basic_Auth_Loader;
@@ -62,8 +60,8 @@ class Base {
 	 * @var array
 	 */
 	protected static $extra_repo_headers = [
-		'languages' => 'Languages',
-		'ci_job'    => 'CI Job',
+		'Languages' => 'Languages',
+		'CIJob'     => 'CI Job',
 	];
 
 	/**
@@ -120,6 +118,12 @@ class Base {
 		} else {
 			self::$installed_apis['gitea_api'] = false;
 		}
+		if ( file_exists( __DIR__ . '/API/Zipfile_API.php' ) ) {
+			self::$installed_apis['zipfile_api'] = true;
+			self::$git_servers['zipfile']        = 'Zipfile';
+		} else {
+			self::$installed_apis['zipfile_api'] = false;
+		}
 	}
 
 	/**
@@ -141,14 +145,12 @@ class Base {
 
 		// Load plugin stylesheet.
 		add_action(
-			'admin_enqueue_scripts', function () {
-				wp_register_style( 'github-updater', plugins_url( basename( dirname( dirname( __DIR__ ) ) ) ) . '/css/github-updater.css' );
+			'admin_enqueue_scripts',
+			function () {
+				wp_register_style( 'github-updater', plugins_url( basename( GITHUB_UPDATER_DIR ) ) . '/css/github-updater.css' );
 				wp_enqueue_style( 'github-updater' );
 			}
 		);
-
-		// Ensure transient updated on plugins.php and themes.php pages.
-		add_action( 'admin_init', [ $this, 'admin_pages_update_transient' ] );
 
 		if ( isset( $_POST['ghu_refresh_cache'] ) ) {
 			/**
@@ -191,7 +193,9 @@ class Base {
 	}
 
 	/**
+	 * Run background processes.
 	 * Piggyback on built-in update function to get metadata.
+	 * Set update transients for remote management.
 	 */
 	public function background_update() {
 		add_action( 'wp_update_plugins', [ $this, 'get_meta_plugins' ] );
@@ -200,6 +204,7 @@ class Base {
 		add_action( 'ghu_get_remote_theme', [ $this, 'run_cron_batch' ], 10, 1 );
 		add_action( 'wp_ajax_nopriv_ithemes_sync_request', [ $this, 'get_meta_remote_management' ] );
 		add_action( 'update_option_auto_updater.lock', [ $this, 'get_meta_remote_management' ] );
+		( new Remote_Management() )->set_update_transients();
 	}
 
 	/**
@@ -238,28 +243,28 @@ class Base {
 	/**
 	 * Add extra headers to get_plugins() or wp_get_themes().
 	 *
-	 * @param $extra_headers
+	 * @param array $extra_headers
 	 *
 	 * @return array
 	 */
 	public function add_headers( $extra_headers ) {
 		$ghu_extra_headers = [
-			'Requires WP'   => 'Requires WP',
-			'Requires PHP'  => 'Requires PHP',
-			'Release Asset' => 'Release Asset',
+			'RequiresWP'   => 'Requires WP',
+			'RequiresPHP'  => 'Requires PHP',
+			'ReleaseAsset' => 'Release Asset',
 		];
 
 		$uri_types = [
-			'plugin' => ' Plugin URI',
-			'theme'  => ' Theme URI',
+			'PluginURI' => ' Plugin URI',
+			'ThemeURI'  => ' Theme URI',
 		];
 
 		foreach ( self::$git_servers as $server ) {
-			foreach ( $uri_types as $uri_type ) {
-				$ghu_extra_headers[ $server . $uri_type ] = $server . $uri_type;
+			foreach ( $uri_types as $uri_key => $uri_value ) {
+				$ghu_extra_headers[ $server . $uri_key ] = $server . $uri_value;
 			}
-			foreach ( self::$extra_repo_headers as $header ) {
-				$ghu_extra_headers[ $server . ' ' . $header ] = $server . ' ' . $header;
+			foreach ( self::$extra_repo_headers as $header_key => $header_value ) {
+				$ghu_extra_headers[ $server . $header_key ] = $server . ' ' . $header_value;
 			}
 		}
 
@@ -285,17 +290,17 @@ class Base {
 	 * Get remote repo meta data for plugins or themes.
 	 * Calls remote APIs for data.
 	 *
-	 * @param $repo
+	 * @param \stdClass $repo
 	 *
 	 * @return bool
 	 */
 	public function get_remote_repo_meta( $repo ) {
 		$file = 'style.css';
 		if ( false !== stripos( $repo->type, 'plugin' ) ) {
-			$file = basename( $repo->slug );
+			$file = basename( $repo->file );
 		}
 
-		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $repo->type, $repo );
+		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $repo->git, $repo );
 		if ( null === $repo_api ) {
 			return false;
 		}
@@ -307,7 +312,7 @@ class Base {
 			if ( ! self::is_wp_cli() ) {
 				if ( ! apply_filters( 'github_updater_run_at_scale', false ) ) {
 					$repo_api->get_repo_meta();
-					$changelog = $this->get_changelog_filename( $repo->type );
+					$changelog = $this->get_changelog_filename( $repo );
 					if ( $changelog ) {
 						$repo_api->get_remote_changes( $changelog );
 					}
@@ -331,18 +336,18 @@ class Base {
 	/**
 	 * Set default values for plugin/theme.
 	 *
-	 * @param $type
+	 * @param string $type
 	 */
 	protected function set_defaults( $type ) {
 		if ( ! isset( self::$options['branch_switch'] ) ) {
 			self::$options['branch_switch'] = null;
 		}
 
-		if ( ! isset( $this->$type->repo ) ) {
+		if ( ! isset( $this->$type->slug ) ) {
 			$this->$type       = new \stdClass();
-			$this->$type->repo = null;
-		} elseif ( ! isset( self::$options[ $this->$type->repo ] ) ) {
-			self::$options[ $this->$type->repo ] = null;
+			$this->$type->slug = null;
+		} elseif ( ! isset( self::$options[ $this->$type->slug ] ) ) {
+			self::$options[ $this->$type->slug ] = null;
 			add_site_option( 'github_updater', self::$options );
 		}
 
@@ -365,24 +370,24 @@ class Base {
 		$this->$type->watchers       = 0;
 		$this->$type->forks          = 0;
 		$this->$type->open_issues    = 0;
-		$this->$type->requires       = null;
+		$this->$type->requires       = false;
 		$this->$type->requires_php   = false;
 	}
 
 	/**
 	 * Get filename of changelog and return.
 	 *
-	 * @param $type
+	 * @param \stdClass $repo
 	 *
 	 * @return bool|string
 	 */
-	protected function get_changelog_filename( $type ) {
+	protected function get_changelog_filename( $repo ) {
 		$changelogs  = [ 'CHANGES.md', 'CHANGELOG.md', 'changes.md', 'changelog.md' ];
 		$changes     = null;
 		$local_files = null;
 
-		if ( is_dir( $this->$type->local_path ) ) {
-			$local_files = scandir( $this->$type->local_path, 0 );
+		if ( is_dir( $repo->local_path ) ) {
+			$local_files = scandir( $repo->local_path, 0 );
 		}
 
 		$changes = array_intersect( (array) $local_files, $changelogs );
@@ -398,13 +403,11 @@ class Base {
 	/**
 	 * Remove hooks after use.
 	 *
-	 * @param object $repo_api
+	 * @param \stdClass $repo_api
 	 */
 	public function remove_hooks( $repo_api ) {
 		remove_filter( 'extra_theme_headers', [ $this, 'add_headers' ] );
 		remove_filter( 'extra_plugin_headers', [ $this, 'add_headers' ] );
-		remove_filter( 'http_request_args', [ 'Fragen\\GitHub_Updater\\API', 'http_request_args' ] );
-		remove_filter( 'http_response', [ 'Fragen\\GitHub_Updater\\API', 'wp_update_response' ] );
 
 		if ( $repo_api instanceof Bitbucket_API ) {
 			$this->remove_authentication_hooks();
@@ -434,8 +437,8 @@ class Base {
 	/**
 	 * Check to see if wp-cron event is overdue by 24 hours and report error message.
 	 *
-	 * @param $cron
-	 * @param $timestamp
+	 * @param array $cron
+	 * @param int   $timestamp
 	 */
 	public function is_cron_overdue( $cron, $timestamp ) {
 		$overdue = ( ( time() - $timestamp ) / HOUR_IN_SECONDS ) > 24;
@@ -509,7 +512,7 @@ class Base {
 		Singleton::get_instance( 'Branch', $this )->set_branch_on_switch( $slug );
 
 		$new_source = $this->fix_misnamed_directory( $new_source, $remote_source, $upgrader_object, $slug );
-		$new_source = $this->fix_gitlab_release_asset_directory( $new_source, $remote_source, $upgrader_object, $slug );
+		$new_source = $this->fix_release_asset_directory( $new_source, $remote_source, $upgrader_object, $slug );
 
 		$wp_filesystem->move( $source, $new_source );
 
@@ -534,8 +537,7 @@ class Base {
 		) {
 			if ( $upgrader_object instanceof Plugin ) {
 				foreach ( (array) $upgrader_object->config as $plugin ) {
-					if ( dirname( $plugin->slug ) === $slug ) {
-						$slug       = $plugin->repo;
+					if ( $slug === $plugin->slug ) {
 						$new_source = trailingslashit( $remote_source ) . $slug;
 						break;
 					}
@@ -543,7 +545,7 @@ class Base {
 			}
 			if ( $upgrader_object instanceof Theme ) {
 				foreach ( (array) $upgrader_object->config as $theme ) {
-					if ( $slug === $theme->repo ) {
+					if ( $slug === $theme->slug ) {
 						$new_source = trailingslashit( $remote_source ) . $slug;
 						break;
 					}
@@ -555,8 +557,10 @@ class Base {
 	}
 
 	/**
-	 * Renaming if using a GitLab Release Asset.
-	 * It has a different download directory structure.
+	 * Fix the directory structure of certain release assests.
+	 *
+	 * GitLab release assets have a different download directory structure.
+	 * Bitbucket release assets need to be copied into a containing directory.
 	 *
 	 * @param string       $new_source
 	 * @param string       $remote_source
@@ -565,13 +569,21 @@ class Base {
 	 *
 	 * @return string $new_source
 	 */
-	private function fix_gitlab_release_asset_directory( $new_source, $remote_source, $upgrader_object, $slug ) {
-		if ( ( isset( $upgrader_object->config[ $slug ]->release_asset ) &&
-			$upgrader_object->config[ $slug ]->release_asset ) &&
-			! empty( $upgrader_object->config[ $slug ]->ci_job )
-		) {
-			$new_source = trailingslashit( dirname( $remote_source ) ) . $slug;
-			add_filter( 'upgrader_post_install', [ $this, 'upgrader_post_install' ], 10, 3 );
+	private function fix_release_asset_directory( $new_source, $remote_source, $upgrader_object, $slug ) {
+		global $wp_filesystem;
+		if ( isset( $upgrader_object->config[ $slug ]->release_asset ) &&
+			$upgrader_object->config[ $slug ]->release_asset ) {
+			if ( 'gitlab' === $upgrader_object->config[ $slug ]->git ) {
+				$new_source = trailingslashit( dirname( $remote_source ) ) . $slug;
+				add_filter( 'upgrader_post_install', [ $this, 'upgrader_post_install' ], 10, 3 );
+			}
+			if ( 'bitbucket' === $upgrader_object->config[ $slug ]->git ) {
+				$temp_source = trailingslashit( dirname( $remote_source ) ) . $slug;
+				$wp_filesystem->move( $remote_source, $temp_source );
+				wp_mkdir_p( $new_source );
+				copy_dir( $temp_source, $new_source );
+				$wp_filesystem->delete( $temp_source, true );
+			}
 		}
 
 		return $new_source;
@@ -615,49 +627,27 @@ class Base {
 		}
 
 		$rename = isset( $upgrader_object->config[ $slug ] ) ? $slug : $rename;
+
 		foreach ( (array) $upgrader_object->config as $repo ) {
-			if ( $slug === $repo->repo || $rename === $repo->repo ) {
-				$arr['repo'] = $repo->repo;
+			// Check repo slug or directory name for match.
+			$slug_check = [
+				$repo->slug,
+				dirname( $repo->file ),
+			];
+
+			// Exact match.
+			if ( \in_array( $slug, $slug_check, true ) ) {
+				$arr['slug'] = $repo->slug;
 				break;
+			}
+
+			// Soft match, there may still be an exact $slug match.
+			if ( \in_array( $rename, $slug_check, true ) ) {
+				$arr['slug'] = $repo->slug;
 			}
 		}
 
 		return $arr;
-	}
-
-	/**
-	 * Test if rollback and then run `set_rollback_transient`.
-	 *
-	 * @uses filter hook 'wp_get_update_data'
-	 *
-	 * @param mixed $update_data
-	 *
-	 * @return mixed $update_data
-	 */
-	public function set_rollback( $update_data ) {
-		if ( empty( $_GET['rollback'] ) && ! isset( $_GET['action'] ) ) {
-			return $update_data;
-		}
-
-		if ( isset( $_GET['plugin'] ) && 'upgrade-plugin' === $_GET['action'] ) {
-			$slug = dirname( $_GET['plugin'] );
-			$type = 'plugin';
-
-			$repo = $this->get_repo_slugs( $slug );
-			$slug = ! empty( $repo ) ? $repo['repo'] : $slug;
-		}
-
-		if ( isset( $_GET['theme'] ) && 'upgrade-theme' === $_GET['action'] ) {
-			$slug = $_GET['theme'];
-			$type = 'theme';
-		}
-
-		if ( ! empty( $slug ) && array_key_exists( $slug, (array) $this->config ) ) {
-			$repo = $this->config[ $slug ];
-			$this->set_rollback_transient( $type, $repo, true );
-		}
-
-		return $update_data;
 	}
 
 	/**
@@ -670,83 +660,44 @@ class Base {
 	 * @return array $rollback Rollback transient.
 	 */
 	protected function set_rollback_transient( $type, $repo, $set_transient = false ) {
-		$repo_api  = Singleton::get_instance( 'API', $this )->get_repo_api( $repo->type, $repo );
-		$this->tag = isset( $_GET['rollback'] ) ? $_GET['rollback'] : null;
-		$slug      = 'plugin' === $type ? $repo->slug : $repo->repo;
-		$rollback  = [
+		$repo_api      = Singleton::get_instance( 'API', $this )->get_repo_api( $repo->git, $repo );
+		$this->tag     = isset( $_GET['rollback'] ) ? $_GET['rollback'] : false;
+		$slug          = 'plugin' === $type ? $repo->file : $repo->slug;
+		$download_link = $repo_api->construct_download_link( $this->tag );
+
+		/**
+		 * Filter download link so developers can point to specific ZipFile
+		 * to use as a download link during a branch switch.
+		 *
+		 * @since 8.6.0
+		 *
+		 * @param string    $download_link Download URL.
+		 * @param /stdClass $repo
+		 * @param string    $this->tag     Branch or tag for rollback.
+		 */
+		$download_link = apply_filters_deprecated(
+			'github_updater_set_rollback_package',
+			[ $download_link, $repo, $this->tag ],
+			'8.8.0',
+			'github_updater_post_construct_download_link'
+		);
+
+		$rollback = [
 			$type         => $slug,
 			'new_version' => $this->tag,
 			'url'         => $repo->uri,
-			'package'     => $repo_api->construct_download_link( false, $this->tag ),
+			'package'     => $download_link,
 			'branch'      => $repo->branch,
 			'branches'    => $repo->branches,
 			'type'        => $repo->type,
 		];
 
 		if ( 'plugin' === $type ) {
-			$rollback['slug'] = $repo->repo;
+			$rollback['slug'] = $repo->slug;
 			$rollback         = (object) $rollback;
 		}
 
-		if ( $set_transient ) {
-			$transient                  = 'update_' . $type . 's';
-			$current                    = get_site_transient( $transient );
-			$current->response[ $slug ] = $rollback;
-			set_site_transient( $transient, $current );
-		}
-
 		return $rollback;
-	}
-
-	/**
-	 * Ensure update transient is update to date on admin pages.
-	 */
-	public function admin_pages_update_transient() {
-		global $pagenow;
-
-		$admin_pages   = [ 'plugins.php', 'themes.php', 'update-core.php' ];
-		$is_admin_page = in_array( $pagenow, $admin_pages, true ) ? true : false;
-		$transient     = 'update_' . rtrim( $pagenow, '.php' );
-		$transient     = 'update_update-core' === $transient ? 'update_core' : $transient;
-
-		if ( $is_admin_page ) {
-			$this->make_update_transient_current( $transient );
-		}
-
-		remove_filter( 'admin_init', [ $this, 'admin_pages_update_transient' ] );
-	}
-
-	/**
-	 * Checks user capabilities then updates the update transient to ensure
-	 * our repositories display update notices correctly.
-	 *
-	 * @param string $transient ( 'update_plugins' | 'update_themes' | 'update_core' ).
-	 */
-	public function make_update_transient_current( $transient ) {
-		if ( ! in_array( $transient, [ 'update_plugins', 'update_themes', 'update_core' ], true ) ) {
-			return;
-		}
-
-		if ( current_user_can( $transient ) ) {
-			$current = get_site_transient( $transient );
-			switch ( $transient ) {
-				case 'update_plugins':
-					$this->get_meta_plugins();
-					$current = Singleton::get_instance( 'Plugin', $this )->pre_set_site_transient_update_plugins( $current );
-					break;
-				case 'update_themes':
-					$this->get_meta_themes();
-					$current = Singleton::get_instance( 'Theme', $this )->pre_set_site_transient_update_themes( $current );
-					break;
-				case 'update_core':
-					$this->get_meta_plugins();
-					$current = Singleton::get_instance( 'Plugin', $this )->pre_set_site_transient_update_plugins( $current );
-					$this->get_meta_themes();
-					$current = Singleton::get_instance( 'Theme', $this )->pre_set_site_transient_update_themes( $current );
-					break;
-			}
-			set_site_transient( $transient, $current );
-		}
 	}
 
 	/**
@@ -759,7 +710,7 @@ class Base {
 	protected function waiting_for_background_update( $repo = null ) {
 		$caches = [];
 		if ( null !== $repo ) {
-			$cache = $this->get_repo_cache( $repo->repo );
+			$cache = isset( $repo->slug ) ? $this->get_repo_cache( $repo->slug ) : null;
 
 			return empty( $cache );
 		}
@@ -768,10 +719,11 @@ class Base {
 			Singleton::get_instance( 'Theme', $this )->get_theme_configs()
 		);
 		foreach ( $repos as $git_repo ) {
-			$caches[ $git_repo->repo ] = $this->get_repo_cache( $git_repo->repo );
+			$caches[ $git_repo->slug ] = $this->get_repo_cache( $git_repo->slug );
 		}
 		$waiting = array_filter(
-			$caches, function ( $e ) {
+			$caches,
+			function ( $e ) {
 				return empty( $e );
 			}
 		);
@@ -782,8 +734,8 @@ class Base {
 	/**
 	 * Create repo parts.
 	 *
-	 * @param $repo
-	 * @param $type
+	 * @param string $repo
+	 * @param string $type plugin|theme.
 	 *
 	 * @return mixed
 	 */
@@ -820,15 +772,15 @@ class Base {
 	/**
 	 * Return correct update row opening and closing tags for Shiny Updates.
 	 *
-	 * @param      $repo_name
-	 * @param      $type
-	 * @param bool      $branch_switcher
+	 * @param string $repo_name
+	 * @param string $type            plugin|theme.
+	 * @param bool   $branch_switcher
 	 *
 	 * @return array
 	 */
 	protected function update_row_enclosure( $repo_name, $type, $branch_switcher = false ) {
 		global $wp_version;
-		$wp_list_table = _get_list_table( 'WP_MS_Themes_List_Table' );
+		$wp_list_table = _get_list_table( 'WP_Plugins_List_Table' );
 		$repo_base     = $repo_name;
 		$shiny_classes = ' notice inline notice-warning notice-alt';
 
@@ -872,7 +824,7 @@ class Base {
 		$rollback = empty( $this->config[ $data['slug'] ]->rollback ) ? [] : $this->config[ $data['slug'] ]->rollback;
 
 		printf(
-			/* translators: current branch name and link */
+			/* translators: 1: branch name, 2: jQuery dropdown, 3: closing tag */
 			esc_html__( 'Current branch is `%1$s`, try %2$sanother version%3$s', 'github-updater' ),
 			$data['branch'],
 			'<a href="#" onclick="jQuery(\'#' . $data['id'] . '\').toggle();return false;">',
@@ -886,7 +838,7 @@ class Base {
 				printf(
 					'<li><a href="%s%s" aria-label="' . esc_html__( 'Switch to branch ', 'github-updater' ) . $branch . '">%s</a></li>',
 					$data['nonced_update_url'],
-					'&rollback=' . urlencode( $branch ),
+					'&rollback=' . rawurlencode( $branch ),
 					esc_attr( $branch )
 				);
 			}
@@ -902,7 +854,7 @@ class Base {
 				printf(
 					'<li><a href="%s%s" aria-label="' . esc_html__( 'Switch to release ', 'github-updater' ) . $tag . '">%s</a></li>',
 					$data['nonced_update_url'],
-					'&rollback=' . urlencode( $tag ),
+					'&rollback=' . rawurlencode( $tag ),
 					esc_attr( $tag )
 				);
 			}
@@ -928,7 +880,7 @@ class Base {
 			add_query_arg(
 				[
 					'action' => $action,
-					$type    => urlencode( $repo_name ),
+					$type    => rawurlencode( $repo_name ),
 				],
 				self_admin_url( 'update.php' )
 			)
@@ -989,16 +941,16 @@ class Base {
 				! empty( $headers[ $repo_parts[ $part ] ] )
 			) {
 				switch ( $part ) {
-					case 'languages':
+					case 'Languages':
 						$header['languages'] = $headers[ $repo_parts[ $part ] ];
 						break;
-					case 'ci_job':
+					case 'CIJob':
 						$header['ci_job'] = $headers[ $repo_parts[ $part ] ];
 						break;
 				}
 			}
 		}
-		$header['release_asset'] = ! $header['release_asset'] ? 'true' === $headers['Release Asset'] : $header['release_asset'];
+		$header['release_asset'] = ! $header['release_asset'] && isset( $headers['Release Asset'] ) ? 'true' === $headers['Release Asset'] : $header['release_asset'];
 
 		return $header;
 	}

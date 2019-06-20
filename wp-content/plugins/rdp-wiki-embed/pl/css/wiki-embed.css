@@ -1121,6 +1121,7 @@ div.thumb img.thumbimage {
    some versions of Firefox, Safari, Konqueror, Chrome etc. */
 tt, code, pre {
     font-family: monospace, sans-serif;
+    background-color: #e6e6e6;
 }
 
 /* </source> */

@@ -1,5 +1,130 @@
 #### [unreleased]
 
+#### 8.8.1 / 2019-06-11
+* set `homepage` to `PluginURI` or `ThemeURI`, fixes [#791](https://github.com/afragen/github-updater/issues/791)
+* fixed Bitbucket release asset updates for proper containing folder structure, thanks @benoitchantre for the bug report
+
+#### 8.8.0 / 2019-05-15
+* switched from `pre_set_site_transient_update_{plugins|themes}` to `site_transient_update_{plugins|themes}`
+* update `Remote_Management` to work with filter change
+* update `CLI_Integration` to work with filter change
+* use `GITHUB_UPDATER_DIR` constant for all enqueuing
+
+#### 8.7.3 / 2019-04-08
+* fixed PHP notices on Install [#775](https://github.com/afragen/github-updater/issues/775)
+* updated location of `tmp-readme.txt` file to use `get_temp_dir()`, thanks @DavidAnderson684
+* a11y updates for `label for=...`
+* fixed to only set cron event for main site only when `DISABLE_WP_CRON` is set, fixes [#782](https://github.com/afragen/github-updater/issues/782)
+* a11y updates for settings tabs
+* remove filter for `http_request_args` after use, fixes [#783](https://github.com/afragen/github-updater/issues/783)
+
+#### 8.7.2 / 2019-03-09
+* hotfix to add parity for themes and prevent PHP warning
+
+#### 8.7.1 / 2019-03-09
+* add new filter hook `github_updater_post_construct_download_link` to allow for returning your own download link
+* deprecate filter hook `github_updater_set_rollback_package` as the above replaces it
+* add _looser_ check of `Base::get_repo_slugs()`, thanks @sc0ttkclark
+* update `class Bitbucket_Server_API`, thanks @allrite for the access
+* added filter hook `github_updater_repo_cache_timeout` to change default timeout per repository, thanks @sc0ttkclark
+
+#### 8.7.0 / 2019-02-24
+* update `Readme_Parser` for changelog and description parsing
+* add filter `github_updater_temp_readme_filepath` to change default location if server has permissions issues, fixes [#766](https://github.com/afragen/github-updater/issues/766)
+* fix `Readme_Parser` to use `version_compare()` when checking compatibility with `create_contributors()`
+* add commit hash and timestamp to branch data, timestamp not returned by this particular GitHub API call 😞
+* add filter `github_updater_remote_is_newer` to use your own version comparison function
+
+#### 8.6.3 / 2019-02-04
+* use Update PHP messaging as in WP 5.1 in version check
+
+#### 8.6.2 / 2019-01-14
+* fix for bug with Bitbucket endpoints, fixes [#757](https://github.com/afragen/github-updater/issues/757)
+
+#### 8.6.1 / 2019-01-11
+* remove `tmp-readme.txt` after parsing, fixes [#754](https://github.com/afragen/github-updater/issues/754)
+* directly call `wp_cron()` after refreshing cache
+* update POT via `composer.json` and wp-cli
+* moved `get_file_headers()` to `trait GHU_Trait`
+* cleanup extra header key/value pairs
+* add endpoint to Bitbucket to get more than default number of tags, branches, or release assets. Fixes [#752](https://github.com/afragen/github-updater/issues/752) thanks @idpaterson
+
+#### 8.6.0 / 2018-12-28 🎂
+* add action hook `github_updater_post_rest_process_request` for @Raruto
+* add filter hook `github_updater_set_rollback_package` for @sc0ttclark and @moderntribe
+* return null for `API_Common::parse_release_asset()` when invalid `$response`, fixes [#750](https://github.com/afragen/github-updater/issues/750)
+* make GitHub private repos with release assets use redirect for download link, fixes [#751](https://github.com/afragen/github-updater/issues/751)
+
+#### 8.5.2 / 2018-12-10
+* fixed parsing of wp.org readme changelog items
+
+#### 8.5.1 / 2018-11-30
+* refactor release asset API calls to `trait API_Common`
+* updated GitLab API v4 endpoints, thanks for all the notice GitLab 😩
+
+#### 8.5.0 / 2018-11-26
+* silence rename PHP warning during plugin update
+* specify branch for changelog
+* refactored dot org override, constant deprecated in favor of new filter `github_updater_override_dot_org`
+* now using vanilla JS for Install settings
+* refactored GitHub release asset code to get direct download link
+* refactored Bitbucket release asset code to get redirected download link for AWS
+* refactored GitLab release asset code to get redirected download link
+* exit early if checking _View details_ but not done with background update, avoids PHP notices
+* updated to add/use composer dependencies and autoloader
+
+#### 8.4.2 / 2018-11-01
+* updated password fields to not autoload saved passwords, thanks @figureone
+* fixed error when saving Remote Management options
+
+#### 8.4.1 / 2018-10-24
+* updated PAnD library with `forever` fix, this was my fault 💩
+
+#### 8.4.0 / 2018-10-23
+* use new constant for assets
+* update error checking for `WP_Error` response from `wp_remote_get()`
+* updated to use Bitbucket API 2.0 where appropriate
+* refactor API calls with new `trait API_Common`
+* attempted to update `class Bitbucket_Server_API`, please let me know if I made 💩
+* refactor release asset and AWS download link code
+* use action hook `requests-requests.before_redirect` to get AWS redirect URL
+* fix for [creating proper GitHub Enterprise base URL](https://github.com/afragen/github-updater/pull/721), oops. Thanks @rlindner
+* fixed [#714](https://github.com/afragen/github-updater/issues/714), get correct Bitbucket release asset download link from AWS
+* update to `class-parser.php` r7679
+* don't run on heartbeat API 💗
+* only run on `admin-ajax.php` when possibly attempting sequential shiny updates, fixes [#723](https://github.com/afragen/github-updater/issues/723)
+* update Persist Admin notices Dismissal library
+
+#### 8.3.1 / 2018-09-13
+* created `class Bootstrap` to setup plugin loading
+* fixed issue with `load_plugin_textdomain()` not loading completely (now loading in `init` hook), thanks @pnoeric and @garrett-eclipse
+
+#### 8.3.0 / 2018-09-12
+* test to ensure `file_put_contents()` works
+* overwrite `tmp-readme.txt` instead of delete
+* delete `tmp-readme.txt` on uninstall
+* switched check for user privileges to `update_{plugins|themes}` and `install_{plugins|themes}`
+* refactored addition of Install tabs for specific privileges
+* switch `repo -> slug` and `slug -> file` in plugin/theme objects for more consistency with WP core
+* add `override` query arg for RESTful updates to specific tags
+* refactor to remove redundancy between rollback and branch switch
+* fixed incorrect update notification after update, fixes [#698](https://github.com/afragen/github-updater/issues/698)
+* fixed to only load `Settings` on appropriate pages, fixes [#711](https://github.com/afragen/github-updater/issues/711)
+* fixed issue where saving options during background updating could cause some checkbox options to be cleared, [5d68ea5](https://github.com/afragen/github-updater/commit/5d68ea54385a2fe62093e25ef42672bbfd504f89)
+* updated error handling of Singleton factory
+* added remote install from a zipfile, remote URL or local file
+* added 'git' and directly declare 'type' in `class Plugin|Theme`
+* started to add language pack support for Gitea
+* use WPCS 1.1.0
+
+#### 8.2.1 / 2018-07-22
+* fixed setting of `Requires PHP` header in `API::set_readme_info()`
+
+#### 8.2.0 / 2018-07-15
+* fixed `register_activation_hook` to add the `develop` branch if that is the source
+* refactored `class Readme_Parser` to use unmodified `vendor/class-parser.php`
+* add `Requires PHP` info to _More Detail_ window
+
 #### 8.1.2 / 2018-06-28
 * fixed malformed link tag, thanks @alexclassroom
 * updated POT
@@ -147,7 +272,7 @@
 
 #### 6.3.2 / 2017-05-09
 * added _broken_ setting to repo not returning HTTP 200 for the main file
-* ~~~fixed PHP error [#549](https://github.com/afragen/github-updater/issues/549)~~~
+* ~~fixed PHP error [#549](https://github.com/afragen/github-updater/issues/549)~~
 * added div class to Settings page to create more specific CSS selectors
 
 #### 6.3.1 / 2017-05-01

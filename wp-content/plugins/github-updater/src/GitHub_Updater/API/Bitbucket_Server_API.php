@@ -26,17 +26,15 @@ if ( ! defined( 'WPINC' ) ) {
  *
  * Get remote data from a self-hosted Bitbucket Server repo.
  * Assumes an owner == project_key
+ * Group URI: https://bitbucket.example.com/projects/<owner>/<repo>
+ * User URI: https://bitbucket.example.com/users/<owner>/<repo>
+ *
+ * @link https://docs.atlassian.com/bitbucket-server/rest/5.3.1/bitbucket-rest.html
  *
  * @author  Andy Fragen
  * @author  Bjorn Wijers
  */
 class Bitbucket_Server_API extends Bitbucket_API {
-	/**
-	 * Holds loose class method name.
-	 *
-	 * @var null
-	 */
-	private static $method;
 
 	/**
 	 * Constructor.
@@ -56,66 +54,36 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 * @return bool
 	 */
 	public function get_remote_info( $file ) {
-		$response = isset( $this->response[ $file ] ) ? $this->response[ $file ] : false;
+		return $this->get_remote_api_info( 'bbserver', $file, "/1.0/:owner/repos/:repo/browse/{$file}" );
+	}
 
-		if ( ! $response ) {
-			self::$method = 'file';
-			$path         = '/1.0/projects/:owner/repos/:repo/browse/' . $file;
-
-			$response = $this->api( $path );
-
-			if ( $response ) {
-				$contents = $this->bbserver_recombine_response( $response );
-				$response = $this->get_file_headers( $contents, $this->type->type );
-				$this->set_repo_cache( $file, $response );
-				$this->set_repo_cache( 'repo', $this->type->repo );
-			}
-		}
-
-		if ( ! is_array( $response ) || $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$response['dot_org'] = $this->get_dot_org_data();
-		$this->set_file_info( $response );
-
-		return true;
+	/**
+	 * Read the repository meta from API
+	 *
+	 * @return bool
+	 */
+	public function get_repo_meta() {
+		return $this->get_remote_api_repo_meta( 'bbserver', '/1.0/:owner/repos/:repo' );
 	}
 
 	/**
 	 * Get the remote info for tags.
 	 *
+	 * @access public
+	 *
 	 * @return bool
 	 */
 	public function get_remote_tag() {
-		$repo_type = $this->return_repo_type();
-		$response  = isset( $this->response['tags'] ) ? $this->response['tags'] : false;
+		return $this->get_remote_api_tag( 'bbserver', '/1.0/:owner/repos/:repo/tags' );
+	}
 
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/projects/:owner/repos/:repo/tags' );
-
-			if ( ! $response ||
-				( isset( $response->size ) && $response->size < 1 ) ||
-				isset( $response->errors )
-			) {
-				$response          = new \stdClass();
-				$response->message = 'No tags found';
-			}
-
-			if ( $response ) {
-				$response = $this->parse_tag_response( $response );
-				$this->set_repo_cache( 'tags', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$tags = $this->parse_tags( $response, $repo_type );
-		$this->sort_tags( $tags );
-
-		return true;
+	/**
+	 * Read and parse remote readme.txt.
+	 *
+	 * @return bool
+	 */
+	public function get_remote_readme() {
+		return $this->get_remote_api_readme( 'bbserver', '/1.0/:owner/repos/:repo/raw/readme.txt' );
 	}
 
 	/**
@@ -126,132 +94,7 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 * @return bool
 	 */
 	public function get_remote_changes( $changes ) {
-		$response = isset( $this->response['changes'] ) ? $this->response['changes'] : false;
-
-		/*
-		 * Set $response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = [];
-			$content  = $this->get_local_info( $this->type, $changes );
-			if ( $content ) {
-				$response['changes'] = $content;
-				$this->set_repo_cache( 'changes', $response );
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			self::$method = 'changes';
-			$response     = $this->bbserver_fetch_raw_file( $changes );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No changelog found';
-			}
-
-			if ( $response ) {
-				$response = wp_remote_retrieve_body( $response );
-				$response = $this->parse_changelog_response( $response );
-				$this->set_repo_cache( 'changes', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$parser    = new \Parsedown();
-		$changelog = $parser->text( $response['changes'] );
-
-		$this->type->sections['changelog'] = $changelog;
-
-		return true;
-	}
-
-	/**
-	 * Read and parse remote readme.txt.
-	 *
-	 * @return bool
-	 */
-	public function get_remote_readme() {
-		if ( ! $this->local_file_exists( 'readme.txt' ) ) {
-			return false;
-		}
-
-		$response = isset( $this->response['readme'] ) ? $this->response['readme'] : false;
-
-		/*
-		 * Set $response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = new \stdClass();
-			$content  = $this->get_local_info( $this->type, 'readme.txt' );
-			if ( $content ) {
-				$response->data = $content;
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			self::$method = 'readme';
-			$response     = $this->bbserver_fetch_raw_file( 'readme.txt' );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No readme found';
-			}
-
-			if ( $response ) {
-				$response = wp_remote_retrieve_body( $response );
-				$response = $this->parse_readme_response( $response );
-			}
-		}
-
-		if ( $response && isset( $response->data ) ) {
-			$file     = $response->data;
-			$parser   = new Readme_Parser( $file );
-			$response = $parser->parse_data();
-			$this->set_repo_cache( 'readme', $response );
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->set_readme_info( $response );
-
-		return true;
-	}
-
-	/**
-	 * Read the repository meta from API
-	 *
-	 * @return bool
-	 */
-	public function get_repo_meta() {
-		$response = isset( $this->response['meta'] ) ? $this->response['meta'] : false;
-
-		if ( ! $response ) {
-			self::$method = 'meta';
-			$response     = $this->api( '/1.0/projects/:owner/repos/:repo' );
-
-			if ( $response ) {
-				$response = $this->parse_meta_response( $response );
-				$this->set_repo_cache( 'meta', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->repo_meta = $response;
-		$this->add_meta_repo_object();
-
-		return true;
+		return $this->get_remote_api_changes( 'bbserver', $changes, "/1.0/:owner/repos/:repo/raw/{$changes}" );
 	}
 
 	/**
@@ -260,35 +103,17 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 * @return bool
 	 */
 	public function get_remote_branches() {
-		$branches = [];
-		$response = isset( $this->response['branches'] ) ? $this->response['branches'] : false;
+		return $this->get_remote_api_branches( 'bbserver', '/1.0/:owner/repos/:repo/branches' );
+	}
 
-		if ( $this->exit_no_update( $response, true ) ) {
-			return false;
-		}
-
-		if ( ! $response ) {
-			self::$method = 'branches';
-			$response     = $this->api( '/1.0/projects/:owner/repos/:repo/branches' );
-			if ( $response && isset( $response->values ) ) {
-				foreach ( (array) $response->values as $value ) {
-					$branch              = $value->displayId;
-					$branches[ $branch ] = $this->construct_download_link( false, $branch );
-				}
-				$this->type->branches = $branches;
-				$this->set_repo_cache( 'branches', $branches );
-
-				return true;
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->branches = $response;
-
-		return true;
+	/**
+	 * Return the Bitbucket Sever release asset URL.
+	 *
+	 * @return string
+	 */
+	public function get_release_asset() {
+		// TODO: make this work.
+		// return $this->get_api_release_asset( 'bbserver', '/1.0/:owner/:repo/downloads' );
 	}
 
 	/**
@@ -299,16 +124,14 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 *
 	 * @link https://bitbucket.org/atlassian/stash-archive
 	 *
-	 * @param boolean $rollback      for theme rollback.
 	 * @param boolean $branch_switch for direct branch changing.
 	 *
 	 * @return string $endpoint
 	 */
-	public function construct_download_link( $rollback = false, $branch_switch = false ) {
-		$download_link_base = $this->get_api_url( '/rest/archive/1.0/projects/:owner/repos/:repo/archive', true );
-
-		self::$method = 'download_link';
-		$endpoint     = $this->add_endpoints( $this, '' );
+	public function construct_download_link( $branch_switch = false ) {
+		self::$method       = 'download_link';
+		$download_link_base = $this->get_api_url( '/latest/:owner/repos/:repo/archive', true );
+		$endpoint           = $this->add_endpoints( $this, '' );
 
 		if ( $branch_switch ) {
 			$endpoint = urldecode( add_query_arg( 'at', $branch_switch, $endpoint ) );
@@ -328,7 +151,6 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	public function add_endpoints( $git, $endpoint ) {
 		switch ( self::$method ) {
 			case 'meta':
-			case 'tags':
 			case 'translation':
 			case 'branches':
 				break;
@@ -341,9 +163,11 @@ class Bitbucket_Server_API extends Bitbucket_API {
 					[
 						'at'  => $git->type->branch,
 						'raw' => '',
-					], $endpoint
+					],
+					$endpoint
 				);
 				break;
+			case 'tags':
 			case 'download_link':
 				/*
 				 * Add a prefix query argument to create a subdirectory with the same name
@@ -351,8 +175,9 @@ class Bitbucket_Server_API extends Bitbucket_API {
 				 * Required for using stash-archive.
 				 */
 				$defaults = [
-					'prefix' => $git->type->repo . '/',
+					'prefix' => $git->type->slug . '/',
 					'at'     => $git->type->branch,
+					'format' => 'zip',
 				];
 				$endpoint = add_query_arg( $defaults, $endpoint );
 				if ( ! empty( $git->type->tags ) ) {
@@ -367,29 +192,6 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	}
 
 	/**
-	 * The Bitbucket Server REST API does not support downloading files directly at the moment
-	 * therefore we'll use this to construct urls to fetch the raw files ourselves.
-	 *
-	 * @param string $file filename.
-	 *
-	 * @return bool|array false upon failure || return wp_safe_remote_get() response array
-	 **/
-	private function bbserver_fetch_raw_file( $file ) {
-		$file         = urlencode( $file );
-		$download_url = '/1.0/projects/:owner/repos/:repo/browse/' . $file;
-		$download_url = $this->add_endpoints( $this, $download_url );
-		$download_url = $this->get_api_url( $download_url );
-
-		$response = wp_safe_remote_get( $download_url );
-
-		if ( is_wp_error( $response ) ) {
-			return false;
-		}
-
-		return $response;
-	}
-
-	/**
 	 * Combines separate text lines from API response into one string with \n line endings.
 	 * Code relying on raw text can now parse it.
 	 *
@@ -397,10 +199,11 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 *
 	 * @return string Combined lines of text returned by API
 	 */
-	private function bbserver_recombine_response( $response ) {
+	protected function bbserver_recombine_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
 		$remote_info_file = '';
-		$json_decoded     = is_string( $response ) ? json_decode( $response ) : '';
-		$response         = empty( $json_decoded ) ? $response : $json_decoded;
 		if ( isset( $response->lines ) ) {
 			foreach ( (array) $response->lines as $line ) {
 				$remote_info_file .= $line->text . "\n";
@@ -418,11 +221,15 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 * @return array $arr Array of meta variables.
 	 */
 	public function parse_meta_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
 		$arr      = [];
 		$response = [ $response ];
 
 		array_filter(
-			$response, function ( $e ) use ( &$arr ) {
+			$response,
+			function ( $e ) use ( &$arr ) {
 				$arr['private']      = ! $e->public;
 				$arr['last_updated'] = null;
 				$arr['watchers']     = 0;
@@ -439,10 +246,9 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 *
 	 * @param string $response Response from API call.
 	 *
-	 * @return array $arr Array of changes in base64.
+	 * @return void
 	 */
 	public function parse_changelog_response( $response ) {
-		return [ 'changes' => $this->bbserver_recombine_response( $response ) ];
 	}
 
 	/**
@@ -450,14 +256,28 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 *
 	 * @param string|\stdClass $response
 	 *
-	 * @return \stdClass $response
+	 * @return void
 	 */
 	protected function parse_readme_response( $response ) {
-		$content        = $this->bbserver_recombine_response( $response );
-		$response       = new \stdClass();
-		$response->data = $content;
+	}
 
-		return $response;
+	/**
+	 * Parse API response and return array of branch data.
+	 *
+	 * @param \stdClass $response API response.
+	 *
+	 * @return array Array of branch data.
+	 */
+	public function parse_branch_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
+		$branches = [];
+		foreach ( $response as $branch ) {
+			$branches[ $branch->displayId ]['download']    = $this->construct_download_link( $branch->displayId );
+			$branches[ $branch->displayId ]['commit_hash'] = $branch->latestCommit;
+		}
+		return $branches;
 	}
 
 	/**
@@ -468,7 +288,7 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 * @return array|\stdClass Array of tag numbers, object is error.
 	 */
 	public function parse_tag_response( $response ) {
-		if ( isset( $response->message ) || ! isset( $response->values ) ) {
+		if ( ! isset( $response->values ) || $this->validate_response( $response ) ) {
 			return $response;
 		}
 
@@ -478,10 +298,33 @@ class Bitbucket_Server_API extends Bitbucket_API {
 				$arr[] = $e->displayId;
 
 				return $arr;
-			}, (array) $response->values
+			},
+			(array) $response->values
 		);
 
 		return $arr;
+	}
+
+	/**
+	 * Parse tags and create download links.
+	 *
+	 * @param \stdClass|array $response Response from API call.
+	 * @param string          $repo_type
+	 *
+	 * @return array
+	 */
+	protected function parse_tags( $response, $repo_type ) {
+		$tags     = [];
+		$rollback = [];
+
+		foreach ( (array) $response as $tag ) {
+			$download_base    = "{$repo_type['base_uri']}/latest/{$this->type->owner}/repos/{$this->type->slug}/archive";
+			$download_base    = $this->add_endpoints( $this, $download_base );
+			$tags[]           = $tag;
+			$rollback[ $tag ] = add_query_arg( 'at', $tag, $download_base );
+		}
+
+		return [ $tags, $rollback ];
 	}
 
 	/**
@@ -554,7 +397,8 @@ class Bitbucket_Server_API extends Bitbucket_API {
 	 */
 	private function add_settings_subtab() {
 		add_filter(
-			'github_updater_add_settings_subtabs', function ( $subtabs ) {
+			'github_updater_add_settings_subtabs',
+			function ( $subtabs ) {
 				return array_merge( $subtabs, [ 'bbserver' => esc_html__( 'Bitbucket Server', 'github-updater' ) ] );
 			}
 		);
@@ -580,22 +424,15 @@ class Bitbucket_Server_API extends Bitbucket_API {
 		}
 
 		if ( ! $bitbucket_org ) {
-			$install['download_link'] = implode(
-				'/', [
-					$base,
-					'rest/archive/1.0/projects',
-					$headers['owner'],
-					'repos',
-					$headers['repo'],
-					'archive',
-				]
-			);
+			$install['download_link'] = "{$base}/rest/api/latest/{$headers['owner']}/repos/{$headers['repo']}/archive";
 
 			$install['download_link'] = add_query_arg(
 				[
 					'prefix' => $headers['repo'] . '/',
 					'at'     => $install['github_updater_branch'],
-				], $install['download_link']
+					'format' => 'zip',
+				],
+				$install['download_link']
 			);
 
 			if ( isset( $install['is_private'] ) ) {

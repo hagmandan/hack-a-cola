@@ -13,7 +13,6 @@ namespace Fragen\GitHub_Updater\API;
 use Fragen\Singleton;
 use Fragen\GitHub_Updater\API;
 use Fragen\GitHub_Updater\Branch;
-use Fragen\GitHub_Updater\Readme_Parser;
 
 /*
  * Exit if called directly.
@@ -30,12 +29,6 @@ if ( ! defined( 'WPINC' ) ) {
  * @author  Andy Fragen
  */
 class GitHub_API extends API implements API_Interface {
-	/**
-	 * Holds loose class method name.
-	 *
-	 * @var null
-	 */
-	private static $method;
 
 	/**
 	 * Constructor.
@@ -65,31 +58,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_info( $file ) {
-		$response = isset( $this->response[ $file ] ) ? $this->response[ $file ] : false;
-
-		if ( ! $response ) {
-			self::$method = 'file';
-			$response     = $this->api( '/repos/:owner/:repo/contents/' . $file );
-			if ( ! isset( $response->content ) ) {
-				return false;
-			}
-
-			if ( $response ) {
-				$contents = base64_decode( $response->content );
-				$response = $this->get_file_headers( $contents, $this->type->type );
-				$this->set_repo_cache( $file, $response );
-				$this->set_repo_cache( 'repo', $this->type->repo );
-			}
-		}
-
-		if ( ! is_array( $response ) || $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$response['dot_org'] = $this->get_dot_org_data();
-		$this->set_file_info( $response );
-
-		return true;
+		return $this->get_remote_api_info( 'github', $file, "/repos/:owner/:repo/contents/{$file}" );
 	}
 
 	/**
@@ -98,32 +67,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_tag() {
-		$repo_type = $this->return_repo_type();
-		$response  = isset( $this->response['tags'] ) ? $this->response['tags'] : false;
-
-		if ( ! $response ) {
-			self::$method = 'tags';
-			$response     = $this->api( '/repos/:owner/:repo/tags' );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No tags found';
-			}
-
-			if ( $response ) {
-				$response = $this->parse_tag_response( $response );
-				$this->set_repo_cache( 'tags', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$tags = $this->parse_tags( $response, $repo_type );
-		$this->sort_tags( $tags );
-
-		return true;
+		return $this->get_remote_api_tag( 'github', '/repos/:owner/:repo/tags' );
 	}
 
 	/**
@@ -134,42 +78,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_changes( $changes ) {
-		$response = isset( $this->response['changes'] ) ? $this->response['changes'] : false;
-
-		/*
-		 * Set response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = [];
-			$content  = $this->get_local_info( $this->type, $changes );
-			if ( $content ) {
-				$response['changes'] = $content;
-				$this->set_repo_cache( 'changes', $response );
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			self::$method = 'changes';
-			$response     = $this->api( '/repos/:owner/:repo/contents/' . $changes );
-
-			if ( $response ) {
-				$response = $this->parse_changelog_response( $response );
-				$this->set_repo_cache( 'changes', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$parser    = new \Parsedown();
-		$changelog = $parser->text( base64_decode( $response['changes'] ) );
-
-		$this->type->sections['changelog'] = $changelog;
-
-		return true;
+		return $this->get_remote_api_changes( 'github', $changes, "/repos/:owner/:repo/contents/{$changes}" );
 	}
 
 	/**
@@ -178,44 +87,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_readme() {
-		if ( ! $this->local_file_exists( 'readme.txt' ) ) {
-			return false;
-		}
-
-		$response = isset( $this->response['readme'] ) ? $this->response['readme'] : false;
-
-		/*
-		 * Set $response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = new \stdClass();
-			$content  = $this->get_local_info( $this->type, 'readme.txt' );
-			if ( $content ) {
-				$response->content = $content;
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			self::$method = 'readme';
-			$response     = $this->api( '/repos/:owner/:repo/contents/readme.txt' );
-		}
-
-		if ( $response && isset( $response->content ) ) {
-			$file     = base64_decode( $response->content );
-			$parser   = new Readme_Parser( $file );
-			$response = $parser->parse_data();
-			$this->set_repo_cache( 'readme', $response );
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->set_readme_info( $response );
-
-		return true;
+		$this->get_remote_api_readme( 'github', '/repos/:owner/:repo/contents/readme.txt' );
 	}
 
 	/**
@@ -224,26 +96,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_repo_meta() {
-		$response = isset( $this->response['meta'] ) ? $this->response['meta'] : false;
-
-		if ( ! $response ) {
-			self::$method = 'meta';
-			$response     = $this->api( '/repos/:owner/:repo' );
-
-			if ( $response ) {
-				$response = $this->parse_meta_response( $response );
-				$this->set_repo_cache( 'meta', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->repo_meta = $response;
-		$this->add_meta_repo_object();
-
-		return true;
+		return $this->get_remote_api_repo_meta( 'github', '/repos/:owner/:repo' );
 	}
 
 	/**
@@ -252,35 +105,16 @@ class GitHub_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_branches() {
-		$branches = [];
-		$response = isset( $this->response['branches'] ) ? $this->response['branches'] : false;
+		return $this->get_remote_api_branches( 'github', '/repos/:owner/:repo/branches' );
+	}
 
-		if ( $this->exit_no_update( $response, true ) ) {
-			return false;
-		}
-
-		if ( ! $response ) {
-			self::$method = 'branches';
-			$response     = $this->api( '/repos/:owner/:repo/branches' );
-
-			if ( $response ) {
-				foreach ( $response as $branch ) {
-					$branches[ $branch->name ] = $this->construct_download_link( false, $branch->name );
-				}
-				$this->type->branches = $branches;
-				$this->set_repo_cache( 'branches', $branches );
-
-				return true;
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->branches = $response;
-
-		return true;
+	/**
+	 * Return the GitHub release asset URL.
+	 *
+	 * @return string|bool
+	 */
+	public function get_release_asset() {
+		return $this->get_api_release_asset( 'github', '/repos/:owner/:repo/releases/latest' );
 	}
 
 	/**
@@ -288,52 +122,53 @@ class GitHub_API extends API implements API_Interface {
 	 *
 	 * @url http://developer.github.com/v3/repos/contents/#get-archive-link
 	 *
-	 * @param boolean $rollback      for theme rollback.
 	 * @param boolean $branch_switch for direct branch changing.
 	 *
 	 * @return string $endpoint
 	 */
-	public function construct_download_link( $rollback = false, $branch_switch = false ) {
+	public function construct_download_link( $branch_switch = false ) {
+		self::$method       = 'download_link';
 		$download_link_base = $this->get_api_url( '/repos/:owner/:repo/zipball/', true );
 		$endpoint           = '';
 
-		/*
-		 * If release asset.
-		 */
+		// Release asset.
 		if ( $this->type->release_asset && '0.0.0' !== $this->type->newest_tag ) {
-			return $this->get_github_release_asset_url();
+			$release_asset = $this->get_release_asset();
+			if ( property_exists( $this->type, 'is_private' ) && $this->type->is_private ) {
+				return $this->get_release_asset_redirect( $release_asset, true );
+			}
+			return $release_asset;
 		}
 
 		/*
-		 * Check for rollback.
+		 * If a branch has been given, use branch.
+		 * If branch is master (default) and tags are used, use newest tag.
 		 */
-		if ( ! empty( $_GET['rollback'] ) &&
-			( isset( $_GET['action'], $_GET['theme'] ) &&
-			'upgrade-theme' === $_GET['action'] &&
-			$this->type->repo === $_GET['theme'] )
-		) {
-			$endpoint .= $rollback;
-
-			/*
-			* For users wanting to update against branch other than master
-			* or if not using tags, else use newest_tag.
-			*/
-		} elseif ( 'master' !== $this->type->branch || empty( $this->type->tags ) ) {
+		if ( 'master' !== $this->type->branch || empty( $this->type->tags ) ) {
 			$endpoint .= $this->type->branch;
 		} else {
 			$endpoint .= $this->type->newest_tag;
 		}
 
-		/*
-		 * Create endpoint for branch switching.
-		 */
+		// Create endpoint for branch switching.
 		if ( $branch_switch ) {
 			$endpoint = $branch_switch;
 		}
 
-		$endpoint = $this->add_access_token_endpoint( $this, $endpoint );
+		$endpoint      = $this->add_access_token_endpoint( $this, $endpoint );
+		$download_link = $download_link_base . $endpoint;
 
-		return $download_link_base . $endpoint;
+		/**
+		 * Filter download link so developers can point to specific ZipFile
+		 * to use as a download link during a branch switch.
+		 *
+		 * @since 8.8.0
+		 *
+		 * @param string    $download_link Download URL.
+		 * @param /stdClass $this->type    Repository object.
+		 * @param string    $branch_switch Branch or tag for rollback or branch switching.
+		 */
+		return apply_filters( 'github_updater_post_construct_download_link', $download_link, $this->type, $branch_switch );
 	}
 
 	/**
@@ -348,12 +183,13 @@ class GitHub_API extends API implements API_Interface {
 		switch ( $git::$method ) {
 			case 'file':
 			case 'readme':
+			case 'changes':
 				$endpoint = add_query_arg( 'ref', $git->type->branch, $endpoint );
 				break;
 			case 'meta':
 			case 'tags':
-			case 'changes':
 			case 'download_link':
+			case 'release_asset':
 			case 'translation':
 				break;
 			case 'branches':
@@ -378,15 +214,16 @@ class GitHub_API extends API implements API_Interface {
 	/**
 	 * Calculate and store time until rate limit reset.
 	 *
-	 * @param $response
-	 * @param $repo
+	 * @param array  $response HTTP headers.
+	 * @param string $repo Repo name.
 	 */
 	public static function ratelimit_reset( $response, $repo ) {
 		if ( isset( $response['headers']['x-ratelimit-reset'] ) ) {
 			$reset                       = (int) $response['headers']['x-ratelimit-reset'];
 			$wait                        = date( 'i', $reset - time() );
 			static::$error_code[ $repo ] = array_merge(
-				static::$error_code[ $repo ], [
+				static::$error_code[ $repo ],
+				[
 					'git'  => 'github',
 					'wait' => $wait,
 				]
@@ -402,7 +239,7 @@ class GitHub_API extends API implements API_Interface {
 	 * @return \stdClass|array $arr Array of tag numbers, object is error.
 	 */
 	public function parse_tag_response( $response ) {
-		if ( isset( $response->message ) ) {
+		if ( $this->validate_response( $response ) ) {
 			return $response;
 		}
 
@@ -412,7 +249,8 @@ class GitHub_API extends API implements API_Interface {
 				$arr[] = $e->name;
 
 				return $arr;
-			}, (array) $response
+			},
+			(array) $response
 		);
 
 		return $arr;
@@ -426,11 +264,15 @@ class GitHub_API extends API implements API_Interface {
 	 * @return array $arr Array of meta variables.
 	 */
 	public function parse_meta_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
 		$arr      = [];
 		$response = [ $response ];
 
 		array_filter(
-			$response, function ( $e ) use ( &$arr ) {
+			$response,
+			function ( $e ) use ( &$arr ) {
 				$arr['private']      = $e->private;
 				$arr['last_updated'] = $e->pushed_at;
 				$arr['watchers']     = $e->watchers;
@@ -450,11 +292,15 @@ class GitHub_API extends API implements API_Interface {
 	 * @return array $arr Array of changes in base64.
 	 */
 	public function parse_changelog_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
 		$arr      = [];
 		$response = [ $response ];
 
 		array_filter(
-			$response, function ( $e ) use ( &$arr ) {
+			$response,
+			function ( $e ) use ( &$arr ) {
 				$arr['changes'] = $e->content;
 			}
 		);
@@ -463,24 +309,45 @@ class GitHub_API extends API implements API_Interface {
 	}
 
 	/**
+	 * Parse API response and return array of branch data.
+	 *
+	 * @param \stdClass $response API response.
+	 *
+	 * @return array Array of branch data.
+	 */
+	public function parse_branch_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
+		$branches = [];
+		foreach ( $response as $branch ) {
+			$branches[ $branch->name ]['download']    = $this->construct_download_link( $branch->name );
+			$branches[ $branch->name ]['commit_hash'] = $branch->commit->sha;
+			$branches[ $branch->name ]['commit_api']  = $branch->commit->url;
+		}
+		return $branches;
+	}
+
+	/**
 	 * Parse tags and create download links.
 	 *
-	 * @param $response
-	 * @param $repo_type
+	 * @param \stdClass|array $response Response from API call.
+	 * @param array           $repo_type
 	 *
 	 * @return array
 	 */
-	private function parse_tags( $response, $repo_type ) {
+	protected function parse_tags( $response, $repo_type ) {
 		$tags     = [];
 		$rollback = [];
 
 		foreach ( (array) $response as $tag ) {
 			$download_base    = implode(
-				'/', [
+				'/',
+				[
 					$repo_type['base_uri'],
 					'repos',
 					$this->type->owner,
-					$this->type->repo,
+					$this->type->slug,
 					'zipball/',
 				]
 			);
@@ -489,94 +356,6 @@ class GitHub_API extends API implements API_Interface {
 		}
 
 		return [ $tags, $rollback ];
-	}
-
-	/**
-	 * Return the AWS download link for a GitHub release asset.
-	 * AWS download link sets a link expiration of ONLY 5 minutes.
-	 *
-	 * @since 6.1.0
-	 * @uses  Requests, requires WP 4.6
-	 *
-	 * @return array|bool|\stdClass
-	 */
-	private function get_github_release_asset_url() {
-		// Unset release asset url if older than 5 min to account for AWS expiration.
-		if ( ( time() - strtotime( '-12 hours', $this->response['timeout'] ) ) >= 300 ) {
-			unset( $this->response['release_asset_url'] );
-		}
-
-		$response = isset( $this->response['release_asset_url'] ) ? $this->response['release_asset_url'] : false;
-
-		if ( $this->exit_no_update( $response ) ) {
-			return false;
-		}
-
-		if ( ! $response ) {
-			$response = $this->api( '/repos/:owner/:repo/releases/latest' );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No release asset found';
-			}
-
-			if ( is_wp_error( $response ) ) {
-				Singleton::get_instance( 'Messages', $this )->create_error_message( $response );
-
-				return false;
-			}
-
-			if ( $response ) {
-				add_filter( 'http_request_args', [ $this, 'set_github_release_asset_header' ] );
-
-				$url          = $this->add_access_token_endpoint( $this, $response->assets[0]->url );
-				$response_new = wp_remote_get( $url );
-
-				remove_filter( 'http_request_args', [ $this, 'set_github_release_asset_header' ] );
-
-				if ( is_wp_error( $response_new ) ) {
-					Singleton::get_instance( 'Messages', $this )->create_error_message( $response_new );
-
-					return false;
-				}
-
-				if ( $response_new['http_response'] instanceof \WP_HTTP_Requests_Response ) {
-					$response_object = $response_new['http_response']->get_response_object();
-					if ( ! $response_object->success ) {
-						return false;
-					}
-					$response_headers = $response_object->history[0]->headers;
-					$download_link    = $response_headers->getValues( 'location' );
-				} else {
-					return false;
-				}
-
-				$response = $download_link[0];
-				$this->set_repo_cache( 'release_asset_url', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		return $response;
-	}
-
-	/**
-	 * Set HTTP header for following GitHub release assets.
-	 *
-	 * @since 6.1.0
-	 *
-	 * @param        $args
-	 * @param string $url
-	 *
-	 * @return mixed $args
-	 */
-	public function set_github_release_asset_header( $args, $url = '' ) {
-		$args['headers']['accept'] = 'application/octet-stream';
-
-		return $args;
 	}
 
 	/**
@@ -666,7 +445,7 @@ class GitHub_API extends API implements API_Interface {
 	/**
 	 * Add remote install settings fields.
 	 *
-	 * @param $type
+	 * @param string $type plugin|theme.
 	 */
 	public function add_install_settings_fields( $type ) {
 		add_settings_field(
@@ -683,7 +462,8 @@ class GitHub_API extends API implements API_Interface {
 	 */
 	private function add_settings_subtab() {
 		add_filter(
-			'github_updater_add_settings_subtabs', function ( $subtabs ) {
+			'github_updater_add_settings_subtabs',
+			function ( $subtabs ) {
 				return array_merge( $subtabs, [ 'github' => esc_html__( 'GitHub', 'github-updater' ) ] );
 			}
 		);
@@ -695,7 +475,7 @@ class GitHub_API extends API implements API_Interface {
 	public function github_access_token() {
 		?>
 		<label for="github_access_token">
-			<input class="github_setting" type="password" style="width:50%;" name="github_access_token" value="">
+			<input class="github_setting" type="password" style="width:50%;" id="github_access_token" name="github_access_token" value="" autocomplete="new-password">
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'Enter GitHub Access Token for private GitHub repositories.', 'github-updater' ); ?>
@@ -707,13 +487,15 @@ class GitHub_API extends API implements API_Interface {
 	/**
 	 * Add remote install feature, create endpoint.
 	 *
-	 * @param $headers
-	 * @param $install
+	 * @param array $headers
+	 * @param array $install
 	 *
 	 * @return mixed
 	 */
 	public function remote_install( $headers, $install ) {
-		$github_com = true;
+		$github_com                         = true;
+		$options['github_access_token']     = isset( static::$options['github_access_token'] ) ? static::$options['github_access_token'] : null;
+		$options['github_enterprise_token'] = isset( static::$options['github_enterprise_token'] ) ? static::$options['github_enterprise_token'] : null;
 
 		if ( 'github.com' === $headers['host'] || empty( $headers['host'] ) ) {
 			$base            = 'https://api.github.com';
@@ -723,15 +505,7 @@ class GitHub_API extends API implements API_Interface {
 			$github_com = false;
 		}
 
-		$install['download_link'] = implode(
-			'/', [
-				$base,
-				'repos',
-				$install['github_updater_repo'],
-				'zipball',
-				$install['github_updater_branch'],
-			]
-		);
+		$install['download_link'] = "{$base}/repos/{$install['github_updater_repo']}/zipball/{$install['github_updater_branch']}";
 
 		// If asset is entered install it.
 		if ( false !== stripos( $headers['uri'], 'releases/download' ) ) {
@@ -752,11 +526,11 @@ class GitHub_API extends API implements API_Interface {
 		if ( $github_com ) {
 			$token = ! empty( $install['options']['github_access_token'] )
 				? $install['options']['github_access_token']
-				: static::$options['github_access_token'];
+				: $options['github_access_token'];
 		} else {
 			$token = ! empty( $install['options']['github_enterprise_token'] )
 				? $install['options']['github_enterprise_token']
-				: static::$options['github_enterprise_token'];
+				: $options['github_enterprise_token'];
 		}
 
 		if ( ! empty( $token ) ) {

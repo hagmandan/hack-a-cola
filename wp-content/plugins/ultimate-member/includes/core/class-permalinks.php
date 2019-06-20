@@ -133,7 +133,13 @@ if ( ! class_exists( 'um\core\Permalinks' ) ) {
 			//use WP native function for fill $_SERVER variables by correct values
 			wp_fix_server_vars();
 
-			$page_url = ( is_ssl() ? 'https://' : 'http://' ) . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+			//check if WP-CLI there isn't set HTTP_HOST, use localhost instead
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				$host = isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'localhost';
+			} else {
+				$host = $_SERVER['HTTP_HOST'];
+			}
+			$page_url = ( is_ssl() ? 'https://' : 'http://' ) . $host . $_SERVER['REQUEST_URI'];
 
 			if ( $no_query_params == true ) {
 				$page_url = strtok( $page_url, '?' );
@@ -373,11 +379,11 @@ if ( ! class_exists( 'um\core\Permalinks' ) ) {
 
 			} else {
 
-				$profile_url =  add_query_arg( 'um_user', $slug, $profile_url );
+				$profile_url =  add_query_arg( 'um_user', strtolower( $slug ), $profile_url );
 
 			}
 
-			return ! empty( $profile_url ) ? strtolower( $profile_url ) : '';
+			return ! empty( $profile_url ) ? $profile_url : '';
 		}
 
 

@@ -82,13 +82,18 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			add_action( 'user_register', array( &$this, 'set_gravatar' ), 11, 1 );
 
 
-			add_action( 'added_existing_user', array( &$this, 'add_um_role_existing_user' ), 10, 2 );
-			add_action( 'wpmu_activate_user', array( &$this, 'add_um_role_wpmu_new_user' ), 10, 1 );
+			if ( is_multisite() ) {
+				add_action( 'added_existing_user', array( &$this, 'add_um_role_existing_user' ), 10, 2 );
+				add_action( 'wpmu_activate_user', array( &$this, 'add_um_role_wpmu_new_user' ), 10, 1 );
+			}
 
 			add_action( 'init', array( &$this, 'check_membership' ), 10 );
 
-			add_action( 'delete_user', array( &$this, 'delete_user_handler' ), 10, 1 );
-			add_action( 'wpmu_delete_user', array( &$this, 'delete_user_handler' ), 10, 1 );
+			if ( is_multisite() ) {
+				add_action( 'wpmu_delete_user', array( &$this, 'delete_user_handler' ), 10, 1 );
+			} else {
+				add_action( 'delete_user', array( &$this, 'delete_user_handler' ), 10, 1 );
+			}
 		}
 
 
@@ -96,7 +101,6 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 * @param $user_id
 		 */
 		function delete_user_handler( $user_id ) {
-
 			um_fetch_user( $user_id );
 
 			/**
@@ -152,7 +156,8 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			}
 
 			// remove uploads
-			UM()->files()->remove_dir( um_user_uploads_dir() );
+			UM()->files()->remove_dir( UM()->files()->upload_temp );
+			UM()->files()->remove_dir( UM()->uploader()->get_upload_base_dir() . um_user( 'ID' ) . DIRECTORY_SEPARATOR );
 		}
 
 
@@ -184,8 +189,9 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 */
 		function add_um_role_existing_user( $user_id, $result ) {
 			// Bail if no user ID was passed
-			if ( empty( $user_id ) )
+			if ( empty( $user_id ) ) {
 				return;
+			}
 
 			if ( ! empty( $_POST['um-role'] ) ) {
 				if ( ! user_can( $user_id, $_POST['um-role'] ) ) {
@@ -313,7 +319,10 @@ if ( ! class_exists( 'um\core\User' ) ) {
 
 
 		/**
-		 * @param $user_id
+		 * Generate User Profile Slug and save to meta
+		 *
+		 * @param int $user_id
+		 * @param bool $force
 		 */
 		function generate_profile_slug( $user_id, $force = false ) {
 			$userdata = get_userdata( $user_id );
@@ -352,7 +361,7 @@ if ( ! class_exists( 'um\core\User' ) ) {
 
 				} else {
 
-					$user_in_url = sanitize_title( $user_in_url );
+					$user_in_url = urlencode( $user_in_url );
 
 				}
 			}
@@ -406,6 +415,8 @@ if ( ! class_exists( 'um\core\User' ) ) {
 				$user_in_url = trim( $user_in_url, $separate );
 			}
 
+			$user_in_url = apply_filters( 'um_change_user_profile_slug', $user_in_url, $user_id );
+
 			if ( $force || empty( $current_profile_slug ) || $current_profile_slug != $user_in_url ) {
 				update_user_meta( $user_id, "um_user_profile_url_slug_{$permalink_base}", $user_in_url );
 			}
@@ -419,8 +430,9 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 */
 		function user_register_via_admin( $user_id ) {
 
-			if ( empty( $user_id ) )
+			if ( empty( $user_id ) ) {
 				return;
+			}
 
 			if ( is_admin() ) {
 				//if there custom 2 role not empty
@@ -473,10 +485,12 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			$userdata  = get_userdata( $user_id );
 			$new_roles = $userdata->roles;
 
-			if ( ! empty( $_POST['um-role'] ) ) {
-				$new_roles = array_merge( $new_roles, array( $_POST['um-role'] ) );
-				if ( ! user_can( $user_id, $_POST['um-role'] ) ) {
-					UM()->roles()->set_role( $user_id, $_POST['um-role'] );
+			if ( is_admin() ) {
+				if ( ! empty( $_POST['um-role'] ) ) {
+					$new_roles = array_merge( $new_roles, array( $_POST['um-role'] ) );
+					if ( ! user_can( $user_id, $_POST['um-role'] ) ) {
+						UM()->roles()->set_role( $user_id, $_POST['um-role'] );
+					}
 				}
 			}
 
@@ -500,7 +514,7 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			 * }
 			 * ?>
 			 */
-			do_action( 'um_after_member_role_upgrade', $new_roles, $old_roles );
+			do_action( 'um_after_member_role_upgrade', $new_roles, $old_roles, $user_id );
 
 			//Update permalink
 			$this->generate_profile_slug( $user_id, true );
@@ -828,9 +842,11 @@ if ( ! class_exists( 'um\core\User' ) ) {
 					}
 
 					// add user meta
-					foreach( $this->usermeta as $k=>$v ) {
-						if ( $k == 'display_name') continue;
-						$this->profile[$k] = $v[0];
+					foreach ( $this->usermeta as $k => $v ) {
+						if ( $k == 'display_name') {
+							continue;
+						}
+						$this->profile[ $k ] = $v[0];
 					}
 
 					// add permissions
@@ -944,9 +960,10 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		/**
 		 * Set user's registration details
 		 *
-		 * @param $submitted
+		 * @param array $submitted
+		 * @param array $args
 		 */
-		function set_registration_details( $submitted ) {
+		function set_registration_details( $submitted, $args ) {
 
 			if ( isset( $submitted['user_pass'] ) ) {
 				unset( $submitted['user_pass'] );
@@ -981,21 +998,22 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			 * @title um_before_save_filter_submitted
 			 * @description Change submitted data before save usermeta "submitted" on registration process
 			 * @input_vars
-			 * [{"var":"$submitted","type":"array","desc":"Submitted data"}]
+			 * [{"var":"$submitted","type":"array","desc":"Submitted data"},
+			 * {"var":"$args","type":"array","desc":"Form Args"}]
 			 * @change_log
 			 * ["Since: 2.0"]
 			 * @usage
-			 * <?php add_filter( 'um_before_save_filter_submitted', 'function_name', 10, 1 ); ?>
+			 * <?php add_filter( 'um_before_save_filter_submitted', 'function_name', 10, 2 ); ?>
 			 * @example
 			 * <?php
-			 * add_filter( 'um_before_save_filter_submitted', 'my_before_save_filter_submitted', 10, 1 );
-			 * function my_before_save_filter_submitted( $submitted ) {
+			 * add_filter( 'um_before_save_filter_submitted', 'my_before_save_filter_submitted', 10, 2 );
+			 * function my_before_save_filter_submitted( $submitted, $args ) {
 			 *     // your code here
 			 *     return $submitted;
 			 * }
 			 * ?>
 			 */
-			$submitted = apply_filters( 'um_before_save_filter_submitted', $submitted );
+			$submitted = apply_filters( 'um_before_save_filter_submitted', $submitted, $args );
 
 			/**
 			 * UM hook
@@ -1131,15 +1149,6 @@ if ( ! class_exists( 'um\core\User' ) ) {
 
 
 		/**
-		 * Set user's hash for password reset
-		 */
-		function password_reset_hash() {
-			$this->profile['reset_pass_hash'] = UM()->validation()->generate();
-			$this->update_usermeta_info('reset_pass_hash');
-		}
-
-
-		/**
 		 * Set user's hash
 		 */
 		function assign_secretkey() {
@@ -1189,7 +1198,12 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 * Password reset email
 		 */
 		function password_reset() {
-			$this->password_reset_hash();
+			$userdata = get_userdata( um_user('ID') );
+			get_password_reset_key( $userdata );
+
+			add_filter( 'um_template_tags_patterns_hook', array( UM()->password(), 'add_placeholder' ), 10, 1 );
+			add_filter( 'um_template_tags_replaces_hook', array( UM()->password(), 'add_replace_placeholder' ), 10, 1 );
+
 			UM()->mail()->send( um_user('user_email'), 'resetpw_email' );
 		}
 
@@ -1217,22 +1231,31 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		?>
 		 *
 		 */
-		function approve() {
+		function approve( $repeat = true ) {
 			$user_id = um_user('ID');
+
+			if ( ! $repeat ) {
+				$status = get_user_meta( $user_id, 'account_status', true );
+				if ( 'approved' === $status ) {
+					return;
+				}
+			}
+
 			delete_option( "um_cache_userdata_{$user_id}" );
 
 			if ( um_user('account_status') == 'awaiting_admin_review' ) {
-				$this->password_reset_hash();
+				$userdata = get_userdata( $user_id );
+				get_password_reset_key( $userdata );
 				UM()->mail()->send( um_user('user_email'), 'approved_email' );
 
 			} else {
-				$this->password_reset_hash();
+				$userdata = get_userdata( $user_id );
+				get_password_reset_key( $userdata );
 				UM()->mail()->send( um_user('user_email'), 'welcome_email');
 			}
 
 			$this->set_status('approved');
 			$this->delete_meta('account_secret_hash');
-			$this->delete_meta('_um_cool_but_hard_to_guess_plain_pw');
 
 			/**
 			 * UM hook
@@ -1364,8 +1387,6 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			if ( 'approved' != um_user( 'account_status' ) ) {
 				$this->send_mail_on_delete = false;
 			}
-
-			$this->delete_user_handler( um_user( 'ID' ) );
 
 			// remove user
 			if ( is_multisite() ) {
@@ -1528,7 +1549,7 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 */
 		function is_private_profile( $user_id ) {
 			$privacy = get_user_meta( $user_id, 'profile_privacy', true );
-			if ( $privacy == __('Only me','ultimate-member') ) {
+			if ( $privacy == __('Only me','ultimate-member') || $privacy == 'Only me' ) {
 				return true;
 			}
 			return false;
@@ -1572,7 +1593,7 @@ if ( ! class_exists( 'um\core\User' ) ) {
 		 * @param $user_id
 		 * @param $case
 		 *
-		 * @return bool|mixed|void
+		 * @return bool
 		 */
 		function is_private_case( $user_id, $case ) {
 			$privacy = get_user_meta( $user_id, 'profile_privacy', true );
@@ -1655,11 +1676,15 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			 * }
 			 * ?>
 			 */
-			$changes = apply_filters('um_before_update_profile', $changes, $this->id );
+			$changes = apply_filters( 'um_before_update_profile', $changes, $args['ID'] );
 
 			foreach ( $changes as $key => $value ) {
 				if ( ! in_array( $key, $this->update_user_keys ) ) {
-					update_user_meta( $this->id, $key, $value );
+					if ( $value === 0 ) {
+						update_user_meta( $this->id, $key, '0' );
+					} else {
+						update_user_meta( $this->id, $key, $value );
+					}
 				} else {
 					$args[ $key ] = esc_attr( $changes[ $key ] );
 				}
@@ -1668,7 +1693,6 @@ if ( ! class_exists( 'um\core\User' ) ) {
 
 			// update user
 			if ( count( $args ) > 1 ) {
-
 				//if isset roles argument validate role to properly for security reasons
 				if ( isset( $args['role'] ) ) {
 					global $wp_roles;
@@ -1885,5 +1909,30 @@ if ( ! class_exists( 'um\core\User' ) ) {
 			return $hash_email_address;
 		}
 
+
+		/**
+		 * UM Placeholders for activation link in email
+		 *
+		 * @param $placeholders
+		 *
+		 * @return array
+		 */
+		function add_activation_placeholder( $placeholders ) {
+			$placeholders[] = '{account_activation_link}';
+			return $placeholders;
+		}
+
+
+		/**
+		 * UM Replace Placeholders for activation link in email
+		 *
+		 * @param $replace_placeholders
+		 *
+		 * @return array
+		 */
+		function add_activation_replace_placeholder( $replace_placeholders ) {
+			$replace_placeholders[] = um_user( 'account_activation_link' );
+			return $replace_placeholders;
+		}
 	}
 }

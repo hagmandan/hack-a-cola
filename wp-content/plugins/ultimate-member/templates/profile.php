@@ -188,10 +188,13 @@
 		 */
 		do_action( "um_profile_content_{$nav}_{$subnav}", $args );
 
-		print "</div>";
+		print "<div class=\"clear\"></div></div>";
 
 		if ( um_is_on_edit_profile() ) { ?>
 			</form>
-		<?php } ?>
+		<?php }
+
+
+		do_action( 'um_profile_footer', $args ); ?>
 	</div>
 </div>

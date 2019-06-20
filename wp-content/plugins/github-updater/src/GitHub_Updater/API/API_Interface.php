@@ -73,16 +73,22 @@ interface API_Interface {
 	public function get_remote_branches();
 
 	/**
+	 * Get release asset URL.
+	 *
+	 * @return string|bool
+	 */
+	public function get_release_asset();
+
+	/**
 	 * Construct $this->type->download_link using Repository Contents API.
 	 *
 	 * @access public
 	 *
-	 * @param bool $rollback      For theme rollback. Defaults to false.
 	 * @param bool $branch_switch For direct branch switching. Defaults to false.
 	 *
 	 * @return string URL for download link.
 	 */
-	public function construct_download_link( $rollback = false, $branch_switch = false);
+	public function construct_download_link( $branch_switch = false);
 
 	/**
 	 * Create endpoints.
@@ -130,6 +136,17 @@ interface API_Interface {
 	public function parse_changelog_response( $response);
 
 	/**
+	 * Parse API response and return array of branch data.
+	 *
+	 * @access public
+	 *
+	 * @param \stdClass $response API response.
+	 *
+	 * @return array Array of branch data.
+	 */
+	public function parse_branch_response( $response );
+
+	/**
 	 * Add values for individual repo add_setting_field().
 	 *
 	 * @return mixed
@@ -148,15 +165,15 @@ interface API_Interface {
 	/**
 	 * Add remote install settings fields.
 	 *
-	 * @param $type
+	 * @param string $type plugin|theme.
 	 */
 	public function add_install_settings_fields( $type);
 
 	/**
 	 *  Add remote install feature, create endpoint.
 	 *
-	 * @param $headers
-	 * @param $install
+	 * @param array $headers
+	 * @param array $install
 	 *
 	 * @return mixed $install
 	 */

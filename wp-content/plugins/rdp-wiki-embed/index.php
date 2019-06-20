@@ -4,7 +4,7 @@
 Plugin Name: RDP Wiki Embed
 Plugin URI: http://www.rdptechsolutions.com/
 Description: Enables the inclusion of Wikimedia content into your own blog page or post through the use of shortcodes.
-Version: 1.2.11
+Version: 1.2.15
 Author: Robert D Payne
 Author URI: http://www.rdptechsolutions.com/
 License: GPLv2 or later
@@ -47,13 +47,14 @@ include_once 'bl/rdpWEUtilities.php';
 class RDP_WIKI_EMBED_PLUGIN {
     public static $plugin_slug = 'rdp-wiki-embed'; 
     public static $options_name = 'rdp_wiki_embed_options';    
-    public static $version = '1.2.11';    
+    public static $version = '1.2.15';    
     private $_options = array(); 
     /* @var $_instance RDP_WIKI_EMBED */
     private $_instance = null;
     private $_resource = '';
     
     function __construct() {
+
         $options = get_option( RDP_WIKI_EMBED_PLUGIN::$options_name );
         if(is_array($options)){
             $this->_options = $options;        
@@ -61,6 +62,8 @@ class RDP_WIKI_EMBED_PLUGIN {
             $this->_options = self::default_settings();
         }
         $this->_resource = RDP_WIKI_EMBED_UTILITIES::globalRequest('rdp_we_resource');  
+
+        
         $REQUEST_URI = '';
         
         if(empty($this->_resource)):
@@ -134,7 +137,7 @@ class RDP_WIKI_EMBED_PLUGIN {
         $this->_instance =  new RDP_WIKI_EMBED(self::$version, $props);
         
         if($this->_resource){
-            add_filter( 'the_content', array( &$this->_instance, 'contentFilter' ),1 );
+            add_filter( 'the_content', array( &$this->_instance, 'contentFilter' ),998 );
         }else{
             add_shortcode('rdp-wiki-embed', array(&$this->_instance, 'shortcode'));
         }        

@@ -60,9 +60,11 @@
 						 */
 						do_action( 'um_members_just_after_name', um_user('ID'), $args ); ?>
 
-						<?php if ( UM()->roles()->um_current_user_can( 'edit', um_user('ID') ) || UM()->roles()->um_user_can( 'can_edit_everyone' ) ) { ?>
+						<?php if ( UM()->roles()->um_current_user_can( 'edit', um_user('ID') ) ) { ?>
 							<div class="um-members-edit-btn">
-								<a href="<?php echo um_edit_profile_url() ?>" class="um-edit-profile-btn um-button um-alt"><?php _e( 'Edit profile','ultimate-member' ) ?></a>
+								<a href="<?php echo um_edit_profile_url() ?>" class="um-edit-profile-btn um-button um-alt">
+									<?php _e( 'Edit profile','ultimate-member' ) ?>
+								</a>
 							</div>
 						<?php }
 
@@ -89,7 +91,7 @@
 						do_action( 'um_members_after_user_name', um_user('ID'), $args ); ?>
 						
 						<?php
-						if ( $show_tagline && is_array( $tagline_fields ) ) {
+						if ( $show_tagline && ! empty( $tagline_fields ) && is_array( $tagline_fields ) ) {
 							
 							um_fetch_user( $member );
 
@@ -100,7 +102,7 @@
 										continue;
 						?>
 						
-						<div class="um-member-tagline um-member-tagline-<?php echo $key;?>"><?php _e( $value, 'ultimate-member'); ?></div>
+						<div class="um-member-tagline um-member-tagline-<?php echo esc_attr( $key );?>"><?php _e( $value, 'ultimate-member'); ?></div>
 						
 						<?php
 								} // end if
@@ -118,16 +120,18 @@
 							<div class="um-member-meta <?php if ( ! $userinfo_animate ) { echo 'no-animate'; } ?>">
 							
 								<?php um_fetch_user( $member );
-								foreach ( $reveal_fields as $key ) {
-									if ( $key ) {
-										$value = um_filtered_value( $key );
-										if ( ! $value )
-											continue; ?>
-								
-										<div class="um-member-metaline um-member-metaline-<?php echo $key; ?>"><span><strong><?php echo UM()->fields()->get_label( $key ); ?>:</strong> <?php _e( $value, 'ultimate-member'); ?></span></div>
+								if ( ! empty( $reveal_fields ) && is_array( $reveal_fields ) ) {
+									foreach ( $reveal_fields as $key ) {
+										if ( $key ) {
+											$value = um_filtered_value( $key );
+											if ( ! $value )
+												continue; ?>
 
-									<?php }
-								} 
+											<div class="um-member-metaline um-member-metaline-<?php echo esc_attr( $key ); ?>"><span><strong><?php echo UM()->fields()->get_label( $key ); ?>:</strong> <?php _e( $value, 'ultimate-member'); ?></span></div>
+
+										<?php }
+									}
+								}
 
 								if ( $show_social ) { ?>
 									<div class="um-member-connect">

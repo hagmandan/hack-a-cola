@@ -20,14 +20,13 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 		 * @var string
 		 */
 		var $pagehook;
+		var $slug = 'ultimatemember';
 
 
 		/**
 		 * Admin_Menu constructor.
 		 */
 		function __construct() {
-			$this->slug = 'ultimatemember';
-
 			add_action( 'admin_menu', array( &$this, 'primary_admin_menu' ), 0 );
 			add_action( 'admin_menu', array( &$this, 'secondary_menu_items' ), 1000 );
 			add_action( 'admin_menu', array( &$this, 'extension_menu' ), 9999 );
@@ -72,10 +71,17 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 
 					<script type="text/javascript">
 						jQuery( 'a.um-admin-rating-link' ).click(function() {
-							jQuery.post(
-								'<?php echo UM()->get_ajax_route( get_class( $this ), 'ultimatemember_rated' ) ?>',
-								{}
-							);
+							jQuery.ajax({
+								url: wp.ajax.settings.url,
+								type: 'post',
+								data: {
+									action: 'um_rated',
+									nonce: um_admin_scripts.nonce
+								},
+								success: function(){
+
+								}
+							});
 							jQuery(this).parent().text( jQuery( this ).data( 'rated' ) );
 						});
 					</script>
@@ -92,8 +98,14 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 		 * When user clicks the review link in backend
 		 */
 		function ultimatemember_rated() {
+			UM()->admin()->check_ajax_nonce();
+
+			if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( __( 'Please login as administrator', 'ultimate-member' ) );
+			}
+
 			update_option( 'um_admin_footer_text_rated', 1 );
-			die();
+			wp_send_json_success();
 		}
 
 
@@ -103,8 +115,9 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 		public function menu_order_count() {
 			global $menu, $submenu;
 
-			if ( ! current_user_can( 'list_users' ) )
+			if ( ! current_user_can( 'list_users' ) ) {
 				return;
+			}
 
 			$count = UM()->user()->get_pending_users_count();
 			if ( is_array( $menu ) ) {
@@ -209,46 +222,11 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 
 			add_meta_box( 'um-metaboxes-sidebox-2', __( 'User Cache', 'ultimate-member' ), array( &$this, 'user_cache' ), $this->pagehook, 'side', 'core' );
 
-			if ( $this->language_avaialable_not_installed() ) {
-				add_meta_box( 'um-metaboxes-sidebox-2', __( 'Language', 'ultimate-member' ), array( &$this, 'dl_language' ), $this->pagehook, 'side', 'core' );
-			} else if ( $this->language_avaialable_installed() ) {
-				add_meta_box( 'um-metaboxes-sidebox-2', __( 'Language', 'ultimate-member' ), array( &$this, 'up_language' ), $this->pagehook, 'side', 'core' );
-			} else if ( $this->language_not_available() ) {
-				add_meta_box( 'um-metaboxes-sidebox-2', __( 'Language', 'ultimate-member' ), array( &$this, 'ct_language' ), $this->pagehook, 'side', 'core' );
-			}
-
 			//If there are active and licensed extensions - show metabox for upgrade it
-			$exts = UM()->plugin_updater()->um_get_active_plugins();
+			$exts = UM()->plugin_updater()->get_active_plugins();
 			if ( 0 < count( $exts ) ) {
 				add_meta_box( 'um-metaboxes-sidebox-3', __( 'Upgrade\'s Manual Request', 'ultimate-member' ), array( &$this, 'upgrade_request' ), $this->pagehook, 'side', 'core' );
 			}
-		}
-
-
-		/**
-		 *
-		 */
-		function up_language() {
-			$locale = get_option('WPLANG');
-			include_once UM()->admin()->templates_path . 'dashboard/language-update.php';
-		}
-
-
-		/**
-		 *
-		 */
-		function dl_language() {
-			$locale = get_option('WPLANG');
-			include_once UM()->admin()->templates_path . 'dashboard/language-download.php';
-		}
-
-
-		/**
-		 *
-		 */
-		function ct_language() {
-			$locale = get_option('WPLANG');
-			include_once UM()->admin()->templates_path . 'dashboard/language-contrib.php';
 		}
 
 
@@ -293,45 +271,6 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 
 
 		/**
-		 * Language not available
-		 *
-		 * @return bool
-		 */
-		function language_not_available() {
-			$locale = get_option( 'WPLANG' );
-			if ( $locale && !strstr($locale, 'en_') && !isset( UM()->available_languages[$locale] ) && !file_exists( WP_LANG_DIR . '/plugins/ultimatemember-' . $locale . '.mo' ) )
-				return true;
-			return false;
-		}
-
-
-		/**
-		 * Language available but not installed
-		 *
-		 * @return bool
-		 */
-		function language_avaialable_not_installed() {
-			$locale = get_option('WPLANG');
-			if ( $locale && isset( UM()->available_languages[$locale] ) && !file_exists( WP_LANG_DIR . '/plugins/ultimatemember-' . $locale . '.mo' ) )
-				return true;
-			return false;
-		}
-
-
-		/**
-		 * Language available and installed
-		 *
-		 * @return bool
-		 */
-		function language_avaialable_installed() {
-			$locale = get_option('WPLANG');
-			if ( $locale && isset( UM()->available_languages[$locale] ) && file_exists( WP_LANG_DIR . '/plugins/ultimatemember-' . $locale . '.mo' ) )
-				return true;
-			return false;
-		}
-
-
-		/**
 		 * Get a directory size
 		 *
 		 * @param $directory
@@ -362,7 +301,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Menu' ) ) {
 
 				<div id="um-metaboxes-general" class="wrap">
 
-					<h2>Ultimate Member <sup><?php echo ultimatemember_version; ?></sup></h2>
+					<h1>Ultimate Member <sup><?php echo ultimatemember_version; ?></sup></h1>
 
 					<?php wp_nonce_field( 'um-metaboxes-general' ); ?>
 					<?php wp_nonce_field( 'closedpostboxes', 'closedpostboxesnonce', false ); ?>

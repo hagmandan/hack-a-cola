@@ -77,8 +77,10 @@ class Settings extends Base {
 		$this->load_hooks();
 
 		// Need to ensure these classes are activated here for hooks to fire.
-		Singleton::get_instance( 'Install', $this );
-		Singleton::get_instance( 'Remote_Management', $this );
+		if ( $this->is_current_page( [ 'options.php', 'options-general.php', 'settings.php' ] ) ) {
+			Singleton::get_instance( 'Install', $this )->run();
+			Singleton::get_instance( 'Remote_Management', $this )->load_hooks();
+		}
 	}
 
 	/**
@@ -87,8 +89,6 @@ class Settings extends Base {
 	protected function load_hooks() {
 		add_action( is_multisite() ? 'network_admin_menu' : 'admin_menu', [ $this, 'add_plugin_page' ] );
 		add_action( 'network_admin_edit_github-updater', [ $this, 'update_settings' ] );
-		add_action( 'admin_init', [ $this, 'update_settings' ] );
-		add_action( 'admin_init', [ $this, 'page_init' ] );
 
 		add_filter(
 			is_multisite()
@@ -96,6 +96,11 @@ class Settings extends Base {
 			: 'plugin_action_links_' . $this->ghu_plugin_name,
 			[ $this, 'plugin_action_links' ]
 		);
+
+		if ( $this->is_current_page( [ 'options.php', 'options-general.php', 'settings.php', 'edit.php' ] ) ) {
+			add_action( 'admin_init', [ $this, 'update_settings' ] );
+			add_action( 'admin_init', [ $this, 'page_init' ] );
+		}
 	}
 
 	/**
@@ -180,13 +185,13 @@ class Settings extends Base {
 	 * @access private
 	 */
 	private function options_tabs() {
-		$current_tab = isset( $_GET['tab'] ) ? $_GET['tab'] : 'github_updater_settings';
-		echo '<h2 class="nav-tab-wrapper">';
+		$current_tab = isset( $_GET['tab'] ) ? esc_attr( $_GET['tab'] ) : 'github_updater_settings';
+		echo '<nav class="nav-tab-wrapper" aria-label="Secondary menu">';
 		foreach ( $this->settings_tabs() as $key => $name ) {
 			$active = ( $current_tab === $key ) ? 'nav-tab-active' : '';
 			echo '<a class="nav-tab ' . $active . '" href="?page=github-updater&tab=' . $key . '">' . $name . '</a>';
 		}
-		echo '</h2>';
+		echo '</nav>';
 	}
 
 	/**
@@ -195,13 +200,13 @@ class Settings extends Base {
 	 * @access private
 	 */
 	private function options_sub_tabs() {
-		$current_tab = isset( $_GET['subtab'] ) ? $_GET['subtab'] : 'github_updater';
-		echo '<h3 class="nav-tab-wrapper">';
+		$current_tab = isset( $_GET['subtab'] ) ? esc_attr( $_GET['subtab'] ) : 'github_updater';
+		echo '<nav class="nav-tab-wrapper" aria-label="Tertiary menu">';
 		foreach ( $this->settings_sub_tabs() as $key => $name ) {
 			$active = ( $current_tab === $key ) ? 'nav-tab-active' : '';
 			echo '<a class="nav-tab ' . $active . '" href="?page=github-updater&tab=github_updater_settings&subtab=' . $key . '">' . $name . '</a>';
 		}
-		echo '</h3>';
+		echo '</nav>';
 	}
 
 	/**
@@ -209,9 +214,9 @@ class Settings extends Base {
 	 */
 	public function create_admin_page() {
 		$action = is_multisite() ? 'edit.php?action=github-updater' : 'options.php';
-		$tab    = isset( $_GET['tab'] ) ? $_GET['tab'] : 'github_updater_settings';
-		$subtab = isset( $_GET['subtab'] ) ? $_GET['subtab'] : 'github_updater';
-		$logo   = plugins_url( basename( dirname( dirname( __DIR__ ) ) ) . '/assets/GitHub_Updater_logo_small.png' ); ?>
+		$tab    = isset( $_GET['tab'] ) ? esc_attr( $_GET['tab'] ) : 'github_updater_settings';
+		$subtab = isset( $_GET['subtab'] ) ? esc_attr( $_GET['subtab'] ) : 'github_updater';
+		$logo   = plugins_url( basename( GITHUB_UPDATER_DIR ) . '/assets/GitHub_Updater_logo_small.png' ); ?>
 		<div class="wrap github-updater-settings">
 			<h1>
 				<a href="https://github.com/afragen/github-updater" target="_blank"><img src="<?php esc_attr_e( $logo ); ?>" alt="GitHub Updater logo" /></a><br>
@@ -233,7 +238,7 @@ class Settings extends Base {
 						$this->add_hidden_settings_sections( $subtab );
 					}
 					submit_button();
-		?>
+					?>
 				</form>
 				<?php $refresh_transients = add_query_arg( [ 'github_updater_refresh_transients' => true ], $action ); ?>
 				<form class="settings" method="post" action="<?php esc_attr_e( $refresh_transients ); ?>">
@@ -341,7 +346,7 @@ class Settings extends Base {
 		foreach ( $ghu_tokens as $token ) {
 			$type                             = '<span class="dashicons dashicons-admin-plugins"></span>&nbsp;';
 			$setting_field                    = [];
-			$ghu_options_keys[ $token->repo ] = null;
+			$ghu_options_keys[ $token->slug ] = null;
 
 			/*
 			 * Check to see if it's a private repo or Enterprise and set variables.
@@ -355,22 +360,21 @@ class Settings extends Base {
 				continue;
 			}
 
-			if ( false !== strpos( $token->type, 'theme' ) ) {
+			if ( 'theme' === $token->type ) {
 				$type = '<span class="dashicons dashicons-admin-appearance"></span>&nbsp;';
 			}
 
-			$setting_field['id']    = $token->repo;
+			$setting_field['id']    = $token->slug;
 			$setting_field['title'] = $type . esc_html( $token->name );
 
-			$token_type         = explode( '_', $token->type );
-			$repo_setting_field = apply_filters( 'github_updater_add_repo_setting_field', [], $token, $token_type[0] );
+			$repo_setting_field = apply_filters( 'github_updater_add_repo_setting_field', [], $token, $token->git );
 
 			if ( empty( $repo_setting_field ) ) {
 				continue;
 			}
 
 			$setting_field             = array_merge( $setting_field, $repo_setting_field );
-			$setting_field['callback'] = $token->repo;
+			$setting_field['callback'] = $token->slug;
 
 			$title = 'token_callback_checkbox' !== $setting_field['callback_method'][1] ? $setting_field['title'] : null;
 			add_settings_field(
@@ -412,7 +416,8 @@ class Settings extends Base {
 
 		if ( in_array( 'bitbucket', $running_servers, true ) ) {
 			$always_unset = array_merge(
-				$always_unset, [
+				$always_unset,
+				[
 					'bitbucket_username',
 					'bitbucket_password',
 				]
@@ -421,7 +426,8 @@ class Settings extends Base {
 
 		if ( in_array( 'bbserver', $running_servers, true ) ) {
 			$always_unset = array_merge(
-				$always_unset, [
+				$always_unset,
+				[
 					'bitbucket_server_username',
 					'bitbucket_server_password',
 				]
@@ -431,7 +437,8 @@ class Settings extends Base {
 		array_map(
 			function ( $e ) use ( &$ghu_unset_keys ) {
 				unset( $ghu_unset_keys[ $e ] );
-			}, $always_unset
+			},
+			$always_unset
 		);
 
 		$auth_required       = static::$auth_required;
@@ -448,7 +455,8 @@ class Settings extends Base {
 				if ( $auth_required[ $key ] ) {
 					unset( $ghu_unset_keys[ $e ] );
 				}
-			}, $auth_required_unset
+			},
+			$auth_required_unset
 		);
 
 		// Unset if current_branch AND if associated with repo.
@@ -464,7 +472,8 @@ class Settings extends Base {
 				if ( ! array_key_exists( $repo, $ghu_tokens ) ) {
 					$reset_keys[ $key ] = $e;
 				}
-			}, $ghu_unset_keys
+			},
+			$ghu_unset_keys
 		);
 		$ghu_unset_keys = array_merge( $ghu_unset_keys, (array) $reset_keys );
 
@@ -479,29 +488,29 @@ class Settings extends Base {
 	/**
 	 * Check to see if it's an enterprise or private repo and set variables.
 	 *
-	 * @param $token
+	 * @param \stdClass $token Repo data.
 	 */
 	private function set_auth_required( $token ) {
 		// Set booleans for Enterprise repos.
 		if ( $token->enterprise ) {
 			static::$auth_required['github_enterprise'] = static::$auth_required['github_enterprise']
-				?: false !== strpos( $token->type, 'github' );
+				?: 'github' === $token->git;
 			static::$auth_required['gitlab_enterprise'] = static::$auth_required['gitlab_enterprise']
-				?: false !== strpos( $token->type, 'gitlab' );
+				?: 'gitlab' === $token->git;
 			static::$auth_required['bitbucket_server']  = static::$auth_required['bitbucket_server']
-				?: false !== strpos( $token->type, 'bitbucket' );
+				?: 'bitbucket' === $token->git;
 		}
 
 		// Set booleans for private repos.
 		if ( $this->is_private( $token ) ) {
 			static::$auth_required['github_private']    = static::$auth_required['github_private']
-				?: false !== strpos( $token->type, 'github' );
+				?: 'github' === $token->git;
 			static::$auth_required['bitbucket_private'] = static::$auth_required['bitbucket_private']
-				?: false !== strpos( $token->type, 'bitbucket' );
+				?: 'bitbucket' === $token->git;
 			static::$auth_required['gitlab_private']    = static::$auth_required['gitlab_private']
-				?: false !== strpos( $token->type, 'gitlab' );
+				?: 'gitlab' === $token->git;
 			static::$auth_required['gitea_private']     = static::$auth_required['gitea_private']
-				?: false !== strpos( $token->type, 'gitea' );
+				?: 'gitea' === $token->git;
 		}
 
 		// Always set to true.
@@ -513,28 +522,59 @@ class Settings extends Base {
 	 * Print the GitHub Updater Settings text.
 	 */
 	public function print_section_ghu_settings() {
-		if ( $this->is_override_dot_org() ) {
-			echo ( wp_kses_post( __( 'Override Dot Org is <strong>active</strong>.', 'github-updater' ) ) );
-		} else {
-			echo( wp_kses_post( __( 'Override Dot Org is <strong>not active</strong>.', 'github-updater' ) ) );
-		}
-		echo '<br>' . esc_html__( 'Override Dot Org will skip any updates from wordpress.org for plugins with identical slugs.', 'github-updater' );
-		/* translators: %s: code fragment */
-		printf( '<br>' . esc_html__( 'Activate Override Dot Org by setting %s', 'github-updater' ), '<code>define( \'GITHUB_UPDATER_OVERRIDE_DOT_ORG\', true );</code>' );
+		$this->display_dot_org_overrides();
 		echo '<p>' . esc_html__( 'Check to enable branch switching from the Plugins or Themes page.', 'github-updater' ) . '</p>';
+	}
+
+	/**
+	 * Display plugins/themes that are overridden using the filter hook.
+	 *
+	 * @uses `github_updater_override_dot_org` filter hook
+	 * @return void
+	 */
+	private function display_dot_org_overrides() {
+		$plugins         = Singleton::get_instance( 'Plugin', $this )->get_plugin_configs();
+		$themes          = Singleton::get_instance( 'Theme', $this )->get_theme_configs();
+		$dashicon_plugin = '<span class="dashicons dashicons-admin-plugins"></span>&nbsp;&nbsp;';
+		$dashicon_theme  = '<span class="dashicons dashicons-admin-appearance"></span>&nbsp;&nbsp;';
+
+		/**
+		 * Filter to return array of overrides to dot org.
+		 *
+		 * @since 8.5.0
+		 * @return array
+		 */
+		$overrides = apply_filters( 'github_updater_override_dot_org', [] );
+
+		if ( ! empty( $overrides ) ) {
+			echo '<h4>' . esc_html__( 'Overridden Plugins and Themes', 'github-updater' ) . '</h4>';
+			echo '<p>' . esc_html__( 'The following plugins or themes might exist on wp.org, but any updates will be downloaded from their respective git repositories.', 'github-updater' ) . '</p>';
+
+			foreach ( $plugins as $plugin ) {
+				if ( in_array( $plugin->file, $overrides, true ) ) {
+					echo '<p>' . $dashicon_plugin . $plugin->name . '</p>';
+				}
+			}
+			foreach ( $themes as $theme ) {
+				if ( in_array( $theme->slug, $overrides, true ) ) {
+					echo '<p>' . $dashicon_theme . $theme->name . '</p>';
+				}
+			}
+			echo '<br>';
+		}
 	}
 
 	/**
 	 * Get the settings option array and print one of its values.
 	 *
-	 * @param $args
+	 * @param array $args
 	 */
 	public function token_callback_text( $args ) {
 		$name = isset( static::$options[ $args['id'] ] ) ? esc_attr( static::$options[ $args['id'] ] ) : '';
 		$type = isset( $args['token'] ) ? 'password' : 'text';
 		?>
 		<label for="<?php esc_attr( $args['id'] ); ?>">
-			<input class="ghu-callback-text" type="<?php esc_attr_e( $type ); ?>" name="github_updater[<?php esc_attr_e( $args['id'] ); ?>]" value="<?php esc_attr_e( $name ); ?>">
+			<input class="ghu-callback-text" type="<?php esc_attr_e( $type ); ?>" id="<?php esc_attr( $args['id'] ); ?>" name="github_updater[<?php esc_attr_e( $args['id'] ); ?>]" value="<?php esc_attr_e( $name ); ?>">
 		</label>
 		<?php
 	}
@@ -542,13 +582,13 @@ class Settings extends Base {
 	/**
 	 * Get the settings option array and print one of its values.
 	 *
-	 * @param $args
+	 * @param array $args
 	 */
 	public function token_callback_checkbox( $args ) {
 		$checked = isset( static::$options[ $args['id'] ] ) ? static::$options[ $args['id'] ] : null;
 		?>
 		<label for="<?php esc_attr_e( $args['id'] ); ?>">
-			<input type="checkbox" name="github_updater[<?php esc_attr_e( $args['id'] ); ?>]" value="1" <?php checked( '1', $checked ); ?> >
+			<input type="checkbox" id="<?php esc_attr_e( $args['id'] ); ?>" name="github_updater[<?php esc_attr_e( $args['id'] ); ?>]" value="1" <?php checked( '1', $checked ); ?> >
 			<?php echo $args['title']; ?>
 		</label>
 		<?php
@@ -588,12 +628,15 @@ class Settings extends Base {
 	private function filter_options() {
 		$options = static::$options;
 
-		// Remove checkbox options.
-		$options = array_filter(
-			$options, function ( $e ) {
-				return '1' !== $e;
-			}
-		);
+		// Remove checkbox options, only after background update complete.
+		if ( ! $this->waiting_for_background_update() ) {
+			$options = array_filter(
+				$options,
+				function ( $e ) {
+					return '1' !== $e;
+				}
+			);
+		}
 
 		$options = array_merge( $options, $_POST['github_updater'] );
 
@@ -641,7 +684,7 @@ class Settings extends Base {
 				],
 				$redirect_url
 			);
-			wp_redirect( $location );
+			wp_safe_redirect( $location );
 			exit;
 		}
 	}
@@ -667,7 +710,7 @@ class Settings extends Base {
 	 *
 	 * @link http://codex.wordpress.org/Plugin_API/Filter_Reference/plugin_action_links_(plugin_file_name)
 	 *
-	 * @param $links
+	 * @param array $links
 	 *
 	 * @return array
 	 */
@@ -704,13 +747,12 @@ class Settings extends Base {
 	 * Places a lock dashicon after the repo name if it's a private repo.
 	 * Places a WordPress dashicon after the repo name if it's in dot org.
 	 *
-	 * @param $type
+	 * @param string $git (github|bitbucket|bbserver|gitlab|gitea)
 	 */
-	private function display_ghu_repos( $type ) {
+	private function display_ghu_repos( $git ) {
 		$lock_title    = esc_html__( 'This is a private repository.', 'github-updater' );
 		$broken_title  = esc_html__( 'This repository has not connected to the API or was unable to connect.', 'github-updater' );
 		$dot_org_title = esc_html__( 'This repository is hosted on WordPress.org.', 'github-updater' );
-		$waiting_title = esc_html__( 'Waiting for WP-Cron to finish.', 'github-updater' );
 
 		$plugins  = Singleton::get_instance( 'Plugin', $this )->get_plugin_configs();
 		$themes   = Singleton::get_instance( 'Theme', $this )->get_theme_configs();
@@ -718,12 +760,13 @@ class Settings extends Base {
 		$bbserver = [ 'bitbucket', 'bbserver' ];
 
 		$type_repos = array_filter(
-			$repos, function ( $e ) use ( $type, $bbserver ) {
-				if ( ! empty( $e->enterprise ) && in_array( $type, $bbserver, true ) ) {
-					return false !== stripos( $e->type, 'bitbucket' ) && 'bbserver' === $type;
+			$repos,
+			function ( $e ) use ( $git, $bbserver ) {
+				if ( ! empty( $e->enterprise ) && in_array( $git, $bbserver, true ) ) {
+					return false !== stripos( $e->git, 'bitbucket' ) && 'bbserver' === $git;
 				}
 
-				return false !== stripos( $e->type, $type );
+				return false !== stripos( $e->git, $git );
 			}
 		);
 
@@ -731,30 +774,31 @@ class Settings extends Base {
 			function ( $e ) {
 				return [
 					'type'    => $e->type,
-					'repo'    => $e->repo,
+					'slug'    => $e->slug,
+					'file'    => isset( $e->file ) ? $e->file : $e->slug,
+					'branch'  => $e->branch,
 					'name'    => $e->name,
 					'private' => isset( $e->is_private ) ? $e->is_private : false,
 					'broken'  => ! isset( $e->remote_version ) || '0.0.0' === $e->remote_version,
 					'dot_org' => isset( $e->dot_org ) ? $e->dot_org : false,
-					'waiting' => $e->waiting,
 				];
-			}, $type_repos
+			},
+			$type_repos
 		);
 
 		$lock    = '&nbsp;<span title="' . $lock_title . '" class="dashicons dashicons-lock"></span>';
 		$broken  = '&nbsp;<span title="' . $broken_title . '" style="color:#f00;" class="dashicons dashicons-warning"></span>';
-		$waiting = '&nbsp;<span title="' . $waiting_title . '" style="color:#ff7900;" class="dashicons dashicons-warning"></span>';
 		$dot_org = '&nbsp;<span title="' . $dot_org_title . '" class="dashicons dashicons-wordpress"></span></span>';
 		printf( '<h2>' . esc_html__( 'Installed Plugins and Themes', 'github-updater' ) . '</h2>' );
 		foreach ( $display_data as $data ) {
-			$dashicon          = false !== strpos( $data['type'], 'theme' )
+			$dashicon   = false !== strpos( $data['type'], 'theme' )
 				? '<span class="dashicons dashicons-admin-appearance"></span>&nbsp;&nbsp;'
 				: '<span class="dashicons dashicons-admin-plugins"></span>&nbsp;&nbsp;';
-			$is_private        = $data['private'] ? $lock : null;
-			$is_broken         = $data['broken'] ? $broken : null;
-			$is_dot_org        = $data['dot_org'] ? $dot_org : null;
-			$waiting_or_broken = $data['waiting'] ? $waiting : $is_broken;
-			printf( '<p>' . $dashicon . $data['name'] . $is_private . $waiting_or_broken . $is_dot_org . '</p>' );
+			$is_private = $data['private'] ? $lock : null;
+			$is_broken  = $data['broken'] ? $broken : null;
+			$override   = $this->override_dot_org( $data['type'], $data );
+			$is_dot_org = $data['dot_org'] && ! $override ? $dot_org : null;
+			printf( '<p>' . $dashicon . $data['name'] . $is_private . $is_dot_org . $is_broken . '</p>' );
 		}
 	}
 }

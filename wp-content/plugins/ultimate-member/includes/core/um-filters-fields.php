@@ -10,7 +10,6 @@
  * @return string
  */
 function um_edit_label_all_fields( $label, $data ) {
-
 	$asterisk = UM()->options()->get( 'form_asterisk' );
 	if ( $asterisk && isset( $data['required'] ) && $data['required'] == 1 )
 		$label = $label . '<span class="um-req" title="'.__('Required','ultimate-member').'">*</span>';
@@ -130,7 +129,8 @@ add_filter( 'um_profile_field_filter_hook__user_registered', 'um_profile_field_f
  * @return string
  */
 function um_profile_field_filter_hook__last_login( $value, $data ) {
-	$value = sprintf( __('Last login: %s','ultimate-member'), um_user_last_login( um_user('ID') ) );
+	//$value = sprintf( __('Last login: %s','ultimate-member'), um_user_last_login( um_user('ID') ) );
+	$value = um_user_last_login( um_user( 'ID' ) );
 	return $value;
 }
 add_filter( 'um_profile_field_filter_hook__last_login', 'um_profile_field_filter_hook__last_login', 99, 2 );
@@ -150,7 +150,8 @@ function um_profile_field_filter_hook__textarea( $value, $data ) {
 		return $value;
 	}
 
-	$value = esc_textarea( $value );
+	$value = wp_kses( $value, 'strip' );
+	$value = html_entity_decode( $value );
 	$value = preg_replace('$(https?://[a-z0-9_./?=&#-]+)(?![^<>]*>)$i', ' <a href="$1" target="_blank">$1</a> ', $value." ");
 	$value = preg_replace('$(www\.[a-z0-9_./?=&#-]+)(?![^<>]*>)$i', '<a target="_blank" href="http://$1">$1</a> ', $value." ");
 	$value = wpautop($value);
@@ -158,7 +159,6 @@ function um_profile_field_filter_hook__textarea( $value, $data ) {
 	return $value;
 }
 add_filter( 'um_profile_field_filter_hook__textarea', 'um_profile_field_filter_hook__textarea', 99, 2 );
-
 
     /***
      ***	@urls in description
@@ -204,10 +204,10 @@ add_filter( 'um_profile_field_filter_hook__time', 'um_profile_field_filter_hook_
  * @return string
  */
 function um_profile_field_filter_hook__date( $value, $data ) {
-	if ( $data['pretty_format'] == 1 ) {
+	if ( isset( $data['pretty_format'] ) && $data['pretty_format'] == 1 ) {
 		$value = UM()->datetime()->get_age( $value );
 	} else {
-		$value = UM()->datetime()->format( $value, $data['format'] );
+		$value = date_i18n( $data['format'], strtotime( $value ) );
 	}
 
 	return $value;
@@ -220,20 +220,37 @@ add_filter( 'um_profile_field_filter_hook__date', 'um_profile_field_filter_hook_
  * @param $value
  * @param $data
  *
- * @return string|void
+ * @return string
  */
 function um_profile_field_filter_hook__file( $value, $data ) {
-	$uri = um_user_uploads_uri() . $value;
-	$extension = pathinfo( $uri, PATHINFO_EXTENSION);
+	$file_type = wp_check_filetype( $value );
+	$uri = UM()->files()->get_download_link( UM()->fields()->set_id, $data['metakey'], um_user( 'ID' ) );
 
-	if ( !file_exists( um_user_uploads_dir() . $value ) ) {
-		$value = __('This file has been removed.');
+	$removed = false;
+	if ( ! file_exists( UM()->uploader()->get_upload_base_dir() . um_user( 'ID' ) . DIRECTORY_SEPARATOR . $value ) ) {
+		if ( is_multisite() ) {
+			//multisite fix for old customers
+			$file_path = str_replace( DIRECTORY_SEPARATOR . 'sites' . DIRECTORY_SEPARATOR . get_current_blog_id() . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR, UM()->uploader()->get_upload_base_dir() . um_user( 'ID' ) . DIRECTORY_SEPARATOR . $value );
+			if ( ! file_exists( $file_path ) ) {
+				$removed = true;
+			}
+		} else {
+			$removed = true;
+		}
+	}
+
+	if ( $removed ) {
+		$value = __( 'This file has been removed.', 'ultimate-member' );
 	} else {
+		$file_info = um_user( $data['metakey'] . "_metadata" );
+		if ( ! empty( $file_info['original_name'] ) ) {
+			$value = $file_info['original_name'];
+		}
 		$value = '<div class="um-single-file-preview show">
                         <div class="um-single-fileinfo">
-                            <a href="' . $uri  . '" target="_blank">
-                                <span class="icon" style="background:'. UM()->files()->get_fonticon_bg_by_ext( $extension ) . '"><i class="'. UM()->files()->get_fonticon_by_ext( $extension ) .'"></i></span>
-                                <span class="filename">' . $value . '</span>
+                            <a href="' . esc_attr( $uri )  . '" target="_blank">
+                                <span class="icon" style="background:'. UM()->files()->get_fonticon_bg_by_ext( $file_type['ext'] ) . '"><i class="'. UM()->files()->get_fonticon_by_ext( $file_type['ext'] ) .'"></i></span>
+                                <span class="filename">' . esc_attr( $value ) . '</span>
                             </a>
                         </div>
                     </div>';
@@ -253,15 +270,28 @@ add_filter( 'um_profile_field_filter_hook__file', 'um_profile_field_filter_hook_
  * @return string
  */
 function um_profile_field_filter_hook__image( $value, $data ) {
-	$uri = um_user_uploads_uri() . $value;
-	$title = ( isset( $data['title'] ) ) ? $data['title'] : __('Untitled photo');
+	$uri = UM()->files()->get_download_link( UM()->fields()->set_id, $data['metakey'], um_user( 'ID' ) );
+	$title = ( isset( $data['title'] ) ) ? $data['title'] : __( 'Untitled photo', 'ultimate-member' );
+
+	$removed = false;
+	if ( ! file_exists( UM()->uploader()->get_upload_base_dir() . um_user( 'ID' ) . DIRECTORY_SEPARATOR . $value ) ) {
+		if ( is_multisite() ) {
+			//multisite fix for old customers
+			$file_path = str_replace( DIRECTORY_SEPARATOR . 'sites' . DIRECTORY_SEPARATOR . get_current_blog_id() . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR, UM()->uploader()->get_upload_base_dir() . um_user( 'ID' ) . DIRECTORY_SEPARATOR . $value );
+			if ( ! file_exists( $file_path ) ) {
+				$removed = true;
+			}
+		} else {
+			$removed = true;
+		}
+	}
 
 	// if value is an image tag
 	if( preg_match( '/\<img.*src=\"([^"]+).*/', $value, $matches ) ) {
 		$uri   = $matches[1];
-		$value = '<div class="um-photo"><a href="#" class="um-photo-modal" data-src="'.$uri.'"><img src="'. $uri .'" alt="'.$title.'" title="'.$title.'" class="" /></a></div>';
-	} else if ( file_exists( um_user_uploads_dir() . $value ) ) {
-		$value = '<div class="um-photo"><a href="#" class="um-photo-modal" data-src="'.$uri.'"><img src="'. $uri .'" alt="'.$title.'" title="'.$title.'" class="" /></a></div>';
+		$value = '<div class="um-photo"><a href="#" class="um-photo-modal" data-src="' . esc_attr( $uri ) . '"><img src="' . esc_attr( $uri ) . '" alt="' . esc_attr( $title ) . '" title="' . esc_attr( $title ) . '" class="" /></a></div>';
+	} else if ( ! $removed ) {
+		$value = '<div class="um-photo"><a href="#" class="um-photo-modal" data-src="' . esc_attr( $uri ) . '"><img src="' . esc_attr( $uri ) . '" alt="' . esc_attr( $title ) . '" title="' . esc_attr( $title ) . '" class="" /></a></div>';
 	} else {
 		$value = '';
 	}
@@ -297,12 +327,13 @@ function um_profile_field_filter_hook__( $value, $data, $type = '' ) {
 			if ( $data['validate'] == 'facebook_url' ) 		$value = 'https://facebook.com/' . $value;
 			if ( $data['validate'] == 'twitter_url' ) 		$value = 'https://twitter.com/' . $value;
 			if ( $data['validate'] == 'linkedin_url' ) 		$value = 'https://linkedin.com/' . $value;
-			if ( $data['validate'] == 'skype' ) 			$value = $value;
+			if ( $data['validate'] == 'skype' ) 			$value = 'skype:'.$value.'?chat';
 			if ( $data['validate'] == 'googleplus_url' ) 	$value = 'https://plus.google.com/' . $value;
 			if ( $data['validate'] == 'instagram_url' ) 	$value = 'https://instagram.com/' . $value;
 			if ( $data['validate'] == 'vk_url' ) 			$value = 'https://vk.com/' . $value;
 		}
 
+		
 		if ( isset( $data['validate'] ) && $data['validate'] == 'skype' ) {
 
 			$value = $value;
@@ -319,6 +350,16 @@ function um_profile_field_filter_hook__( $value, $data, $type = '' ) {
 
 	}
 
+	if ( isset( $data['validate'] ) && $data['validate'] == 'skype' ) {
+		
+		$value = str_replace('https://','',$value );
+		$value = str_replace('http://','',$value );
+		
+		$data['url_target'] = ( isset( $data['url_target'] ) ) ? $data['url_target'] : '_blank';
+		$value = '<a href="'. 'skype:'.$value.'?chat'.'" title="'.$value.'" target="'.$data['url_target'].'" ' . $url_rel . '>'.$value.'</a>';
+
+	} 
+	
 	if ( !is_array( $value ) ) {
 		if ( is_email( $value ) )
 			$value = '<a href="mailto:'. $value.'" title="'.$value.'">'.$value.'</a>';
@@ -401,7 +442,10 @@ function um_get_custom_field_array( $array, $fields ) {
 							$array['required'] = 0;
 						}
 					} elseif ( $op == 'contains' ) {
-						if ( strstr( $cond_value, $parent_value ) ) {
+						if ( is_string( $cond_value ) && strstr( $cond_value, $parent_value ) ) {
+							$array['required'] = 0;
+						}
+						if( is_array( $cond_value ) && in_array( $parent_value, $cond_value ) ) {
 							$array['required'] = 0;
 						}
 					}
@@ -431,7 +475,10 @@ function um_get_custom_field_array( $array, $fields ) {
 							$array['required'] = 0;
 						}
 					} elseif ( $op == 'contains' ) {
-						if ( ! strstr( $cond_value, $parent_value ) ) {
+						if( is_string( $cond_value ) && !strstr( $cond_value, $parent_value ) ) {
+							$array['required'] = 0;
+						}
+						if( is_array( $cond_value ) && !in_array( $parent_value, $cond_value ) ) {
 							$array['required'] = 0;
 						}
 					}
@@ -611,20 +658,64 @@ function um_profile_field_filter_xss_validation( $value, $data, $type = '' ) {
 		$value = stripslashes( $value );
 		$data['validate'] = isset( $data['validate'] ) ? $data['validate'] : '';
 
-		if( 'text' == $type && ! in_array( $data['validate'], array( 'unique_email' ) ) || 'password' == $type ) {
+		if ( 'text' == $type && ! in_array( $data['validate'], array( 'unique_email' ) ) || 'password' == $type ) {
 			$value = esc_attr( $value );
-		} elseif( $type == 'url' ) {
+		} elseif ( $type == 'url' ) {
 			$value = esc_url( $value );
 		} elseif ( 'textarea' == $type ) {
 			if ( empty( $data['html'] ) ) {
 				$value =  wp_kses_post( $value );
+			}
+		} elseif ( 'rating' == $type ) {
+			if ( ! is_numeric( $value ) ) {
+				$value = 0;
+			} else {
+				if ( $data['number'] == 5 ) {
+					if ( ! in_array( $value, range( 1, 5 ) ) ) {
+						$value = 0;
+					}
+				} elseif ( $data['number'] == 10 ) {
+					if ( ! in_array( $value, range( 1, 10 ) ) ) {
+						$value = 0;
+					}
+				}
+			}
+		} elseif ( 'select' == $type || 'radio' == $type ) {
+			if ( ! empty( $data['options'] ) && ! in_array( $value, $data['options'] ) ) {
+				$value = '';
+			}
+		}
+	} elseif ( ! empty( $value ) ) {
+		if ( 'multiselect' == $type || 'checkbox' == $type ) {
+			if ( ! empty( $data['options'] ) && is_array( $value ) ) {
+				$value = array_intersect( $value, $data['options'] );
 			}
 		}
 	}
 
 	return $value;
 }
-add_filter( 'um_profile_field_filter_hook__','um_profile_field_filter_xss_validation', 10, 3 );
+add_filter( 'um_profile_field_filter_hook__', 'um_profile_field_filter_xss_validation', 10, 3 );
+
+
+/**
+ * Trim All form POST submitted data
+ *
+ * @param $post_form
+ * @param $mode
+ *
+ * @return mixed
+ */
+function um_submit_form_data_trim_fields( $post_form, $mode ) {
+	foreach ( $post_form as $key => $field ) {
+		if ( is_string( $field ) ) {
+			$post_form[ $key ] = trim( $field );
+		}
+	}
+
+	return $post_form;
+}
+add_filter( 'um_submit_form_data', 'um_submit_form_data_trim_fields', 9, 2 );
 
 
 /**

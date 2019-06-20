@@ -1,7 +1,7 @@
 jQuery(document).ready(function() {
 
 	/* Remove field permanently */
-	jQuery(document).on('click', '.um-admin-btns a span.remove', function(e){
+	jQuery(document.body).on('click', '.um-admin-btns a span.remove', function(e){
 		e.preventDefault();
 
 		if ( confirm( 'This will permanently delete this custom field from database' ) ) {
@@ -11,9 +11,15 @@ jQuery(document).ready(function() {
 			arg1 = jQuery(this).parents('a').data('arg1');
 
 			jQuery.ajax({
-				url: um_admin_field_data.do_ajax_url,
+				url: wp.ajax.settings.url,
 				type: 'POST',
-				data: {act_id : 'um_admin_remove_field_global', arg1 : arg1 },
+				data: {
+					action:'um_do_ajax_action',
+					act_id : 'um_admin_remove_field_global',
+					arg1 : arg1,
+					nonce: um_admin_scripts.nonce
+
+				},
 				success: function(data){
 					
 				},
@@ -28,7 +34,7 @@ jQuery(document).ready(function() {
 
 
 	/* Add a Field */
-	jQuery(document).on('submit', 'form.um_add_field', function(e){
+	jQuery(document.body).on('submit', 'form.um_add_field', function(e){
 
 		e.preventDefault();
         var conditions = jQuery('.um-admin-cur-condition');
@@ -59,7 +65,7 @@ jQuery(document).ready(function() {
 		var form = jQuery(this);
 
 		jQuery.ajax({
-			url: um_admin_field_data.ajax_url,
+			url: wp.ajax.settings.url,
 			type: 'POST',
 			dataType: 'json',
 			data: form.serialize(),

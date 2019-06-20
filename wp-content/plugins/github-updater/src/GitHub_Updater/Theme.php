@@ -132,23 +132,26 @@ class Theme extends Base {
 				}
 
 				$header         = $this->parse_extra_headers( $header, $theme, $header_parts, $repo_parts );
-				$current_branch = 'current_branch_' . $header['repo'];
+				$current_branch = "current_branch_{$header['repo']}";
 				$branch         = isset( static::$options[ $current_branch ] )
 					? static::$options[ $current_branch ]
 					: false;
 
-				$git_theme['type']                    = $repo_parts['type'];
-				$git_theme['uri']                     = $header['base_uri'] . '/' . $header['owner_repo'];
+				$git_theme['type']                    = 'theme';
+				$git_theme['git']                     = $repo_parts['git_server'];
+				$git_theme['uri']                     = "{$header['base_uri']}/{$header['owner_repo']}";
 				$git_theme['enterprise']              = $header['enterprise_uri'];
 				$git_theme['enterprise_api']          = $header['enterprise_api'];
 				$git_theme['owner']                   = $header['owner'];
-				$git_theme['repo']                    = $header['repo'];
+				$git_theme['slug']                    = $header['repo'];
+				$git_theme['file']                    = "{$header['repo']}/style.css";
 				$git_theme['name']                    = $theme->get( 'Name' );
 				$git_theme['theme_uri']               = $theme->get( 'ThemeURI' );
+				$git_theme['homepage']                = $theme->get( 'ThemeURI' );
 				$git_theme['author']                  = $theme->get( 'Author' );
 				$git_theme['local_version']           = strtolower( $theme->get( 'Version' ) );
 				$git_theme['sections']['description'] = $theme->get( 'Description' );
-				$git_theme['local_path']              = get_theme_root() . '/' . $git_theme['repo'] . '/';
+				$git_theme['local_path']              = get_theme_root() . '/' . $git_theme['slug'] . '/';
 				$git_theme['branch']                  = $branch ?: 'master';
 				$git_theme['languages']               = $header['languages'];
 				$git_theme['ci_job']                  = $header['ci_job'];
@@ -163,7 +166,7 @@ class Theme extends Base {
 				continue;
 			}
 
-			$git_themes[ $git_theme['repo'] ] = (object) $git_theme;
+			$git_themes[ $git_theme['slug'] ] = (object) $git_theme;
 		}
 
 		return $git_themes;
@@ -188,10 +191,8 @@ class Theme extends Base {
 				|| apply_filters( 'github_updater_disable_wpcron', false )
 			) {
 				$this->get_remote_repo_meta( $theme );
-				$theme->waiting = false;
 			} else {
-				$theme->waiting         = true;
-				$themes[ $theme->repo ] = $theme;
+				$themes[ $theme->slug ] = $theme;
 			}
 
 			/*
@@ -200,23 +201,24 @@ class Theme extends Base {
 			if ( is_multisite() ) {
 				add_action( 'after_theme_row', [ $this, 'remove_after_theme_row' ], 10, 2 );
 				if ( ! $this->tag ) {
-					add_action( "after_theme_row_$theme->repo", [ $this, 'wp_theme_update_row' ], 10, 2 );
+					add_action( "after_theme_row_{$theme->slug}", [ $this, 'wp_theme_update_row' ], 10, 2 );
 					if ( ! $theme->release_asset ) {
-						add_action( "after_theme_row_$theme->repo", [ $this, 'multisite_branch_switcher' ], 15, 2 );
+						add_action( "after_theme_row_{$theme->slug}", [ $this, 'multisite_branch_switcher' ], 15, 2 );
 					}
 				}
 			}
 		}
 
-		if ( ! wp_next_scheduled( 'ghu_get_remote_theme' ) &&
+		$schedule_event = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? is_main_site() : true;
+
+		if ( $schedule_event ) {
+			if ( ! wp_next_scheduled( 'ghu_get_remote_theme' ) &&
 			! $this->is_duplicate_wp_cron_event( 'ghu_get_remote_theme' ) &&
 			! apply_filters( 'github_updater_disable_wpcron', false )
-		) {
-			wp_schedule_single_event( time(), 'ghu_get_remote_theme', [ $themes ] );
+			) {
+				wp_schedule_single_event( time(), 'ghu_get_remote_theme', [ $themes ] );
+			}
 		}
-
-		// Update theme transient with rollback (branch switching) data.
-		add_filter( 'wp_get_update_data', [ $this, 'set_rollback' ] );
 
 		if ( ! static::is_wp_cli() ) {
 			$this->load_pre_filters();
@@ -231,15 +233,15 @@ class Theme extends Base {
 			add_filter( 'wp_prepare_themes_for_js', [ $this, 'customize_theme_update_html' ] );
 		}
 		add_filter( 'themes_api', [ $this, 'themes_api' ], 99, 3 );
-		add_filter( 'pre_set_site_transient_update_themes', [ $this, 'pre_set_site_transient_update_themes' ] );
+		add_filter( 'site_transient_update_themes', [ $this, 'update_site_transient' ], 15, 1 );
 	}
 
 	/**
 	 * Put changelog in themes_api, return WP.org data as appropriate.
 	 *
-	 * @param $false
-	 * @param $action
-	 * @param $response
+	 * @param bool      $false
+	 * @param string    $action
+	 * @param \stdClass $response
 	 *
 	 * @return mixed
 	 */
@@ -250,14 +252,19 @@ class Theme extends Base {
 
 		$theme = isset( $this->config[ $response->slug ] ) ? $this->config[ $response->slug ] : false;
 
+		// Skip if waiting for background update.
+		if ( $this->waiting_for_background_update( $theme ) ) {
+			return $false;
+		}
+
 		// wp.org theme.
 		if ( ! $theme ) {
 			return $false;
 		}
 
-		$response->slug         = $theme->repo;
+		$response->slug         = $theme->slug;
 		$response->name         = $theme->name;
-		$response->homepage     = $theme->uri;
+		$response->homepage     = $theme->homepage;
 		$response->donate_link  = $theme->donate_link;
 		$response->version      = $theme->remote_version;
 		$response->sections     = $theme->sections;
@@ -278,8 +285,8 @@ class Theme extends Base {
 	 * Add custom theme update row, from /wp-admin/includes/update.php
 	 * Display update details or rollback links for multisite installation.
 	 *
-	 * @param $theme_key
-	 * @param $theme
+	 * @param string $theme_key
+	 * @param array  $theme
 	 *
 	 * @author Seth Carstens
 	 */
@@ -317,13 +324,6 @@ class Theme extends Base {
 		);
 		$enclosure         = $this->update_row_enclosure( $theme_key, 'theme' );
 
-		/*
-		 * Update transient if necessary.
-		 */
-		if ( empty( $current->response ) && empty( $current->up_to_date ) ) {
-			$this->pre_set_site_transient_update_themes( $current );
-		}
-
 		if ( isset( $current->response[ $theme_key ] ) ) {
 			$response = $current->response[ $theme_key ];
 			echo $enclosure['open'];
@@ -345,7 +345,7 @@ class Theme extends Base {
 					esc_html__( 'View version %s details.', 'github-updater' ),
 					$response['new_version']
 				);
-				echo '</a><em>';
+				echo '</a>&nbsp;<em>';
 				esc_html_e( 'Automatic update is unavailable for this theme.', 'github-updater' );
 				echo '</em>';
 			} else {
@@ -370,8 +370,8 @@ class Theme extends Base {
 	/**
 	 * Create branch switcher row for multisite installation.
 	 *
-	 * @param $theme_key
-	 * @param $theme
+	 * @param string $theme_key
+	 * @param array  $theme
 	 *
 	 * @return bool
 	 */
@@ -416,8 +416,8 @@ class Theme extends Base {
 	 *
 	 * @author @grappler
 	 *
-	 * @param $theme_key
-	 * @param $theme
+	 * @param string $theme_key
+	 * @param array  $theme
 	 */
 	public function remove_after_theme_row( $theme_key, $theme ) {
 		$themes = $this->get_theme_configs();
@@ -461,23 +461,23 @@ class Theme extends Base {
 	 *
 	 * @author Seth Carstens
 	 *
-	 * @param $prepared_themes
+	 * @param array $prepared_themes
 	 *
 	 * @return mixed
 	 */
 	public function customize_theme_update_html( $prepared_themes ) {
 		foreach ( (array) $this->config as $theme ) {
-			if ( empty( $prepared_themes[ $theme->repo ] ) ) {
+			if ( empty( $prepared_themes[ $theme->slug ] ) ) {
 				continue;
 			}
 
-			if ( ! empty( $prepared_themes[ $theme->repo ]['hasUpdate'] ) ) {
-				$prepared_themes[ $theme->repo ]['update'] = $this->append_theme_actions_content( $theme );
+			if ( ! empty( $prepared_themes[ $theme->slug ]['hasUpdate'] ) ) {
+				$prepared_themes[ $theme->slug ]['update'] = $this->append_theme_actions_content( $theme );
 			} else {
-				$prepared_themes[ $theme->repo ]['description'] .= $this->append_theme_actions_content( $theme );
+				$prepared_themes[ $theme->slug ]['description'] .= $this->append_theme_actions_content( $theme );
 			}
 			if ( ! $theme->release_asset ) {
-				$prepared_themes[ $theme->repo ]['description'] .= $this->single_install_switcher( $theme );
+				$prepared_themes[ $theme->slug ]['description'] .= $this->single_install_switcher( $theme );
 			}
 		}
 
@@ -500,7 +500,7 @@ class Theme extends Base {
 			add_query_arg(
 				[
 					'tab'       => 'theme-information',
-					'theme'     => $theme->repo,
+					'theme'     => $theme->slug,
 					'TB_iframe' => 'true',
 					'width'     => 270,
 					'height'    => 400,
@@ -509,8 +509,8 @@ class Theme extends Base {
 			)
 		);
 		$nonced_update_url = wp_nonce_url(
-			$this->get_update_url( 'theme', 'upgrade-theme', $theme->repo ),
-			'upgrade-theme_' . $theme->repo
+			$this->get_update_url( 'theme', 'upgrade-theme', $theme->slug ),
+			'upgrade-theme_' . $theme->slug
 		);
 
 		$current = get_site_transient( 'update_themes' );
@@ -519,7 +519,7 @@ class Theme extends Base {
 		 * Display theme update links.
 		 */
 		ob_start();
-		if ( isset( $current->response[ $theme->repo ] ) ) {
+		if ( isset( $current->response[ $theme->slug ] ) ) {
 			?>
 			<p>
 				<strong>
@@ -541,7 +541,7 @@ class Theme extends Base {
 						'</a>',
 						sprintf(
 							/* translators: %s: theme name */
-							'<a aria-label="' . esc_html__( 'Update %s now', 'github-updater' ) . '" id="update-theme" data-slug="' . $theme->repo . '" href="' . $nonced_update_url . '">',
+							'<a aria-label="' . esc_html__( 'Update %s now', 'github-updater' ) . '" id="update-theme" data-slug="' . $theme->slug . '" href="' . $nonced_update_url . '">',
 							$theme->name
 						)
 					);
@@ -565,8 +565,8 @@ class Theme extends Base {
 	 */
 	protected function single_install_switcher( $theme ) {
 		$nonced_update_url = wp_nonce_url(
-			$this->get_update_url( 'theme', 'upgrade-theme', $theme->repo ),
-			'upgrade-theme_' . $theme->repo
+			$this->get_update_url( 'theme', 'upgrade-theme', $theme->slug ),
+			'upgrade-theme_' . $theme->slug
 		);
 		$rollback_url      = sprintf( '%s%s', $nonced_update_url, '&rollback=' );
 
@@ -617,24 +617,24 @@ class Theme extends Base {
 	}
 
 	/**
-	 * Hook into pre_set_site_transient_update_themes to update.
+	 * Hook into site_transient_update_themes to update.
 	 * Finds newest tag and compares to current tag.
 	 *
 	 * @param array $transient
 	 *
 	 * @return array|\stdClass
 	 */
-	public function pre_set_site_transient_update_themes( $transient ) {
+	public function update_site_transient( $transient ) {
 		foreach ( (array) $this->config as $theme ) {
 			if ( $this->can_update_repo( $theme ) ) {
 				$response = [
-					'theme'       => $theme->repo,
+					'theme'       => $theme->slug,
 					'new_version' => $theme->remote_version,
 					'url'         => $theme->uri,
 					'package'     => $theme->download_link,
 					'branch'      => $theme->branch,
 					'branches'    => array_keys( $theme->branches ),
-					'type'        => $theme->type,
+					'type'        => "{$theme->git}-{$theme->type}",
 				];
 
 				// Skip on RESTful updating.
@@ -645,33 +645,29 @@ class Theme extends Base {
 					continue;
 				}
 
-				// If branch is 'master' and repo is in wp.org repo then pull update from wp.org.
-				if ( $theme->dot_org && 'master' === $theme->branch ) {
-					$transient = empty( $transient ) ? get_site_transient( 'update_themes' ) : $transient;
-					if ( isset( $transient->response[ $theme->repo ], $transient->response[ $theme->repo ]['type'] ) ) {
-						unset( $transient->response[ $theme->repo ] );
-					}
-					if ( ! $this->tag ) {
-						continue;
-					}
+				// Pull update from dot org if not overriding.
+				if ( ! $this->override_dot_org( 'theme', $theme ) ) {
+					continue;
 				}
 
-				$transient->response[ $theme->repo ] = $response;
-			}
-
-			// Unset if override dot org AND same slug on dot org.
-			if ( isset( $transient->response[ $theme->repo ] ) &&
-				! isset( $transient->response[ $theme->repo ]['type'] ) &&
-				$this->is_override_dot_org()
-			) {
-				unset( $transient->response[ $theme->repo ] );
+				$transient->response[ $theme->slug ] = $response;
+			} else {
+				/**
+				 * Filter to return array of overrides to dot org.
+				 *
+				 * @since 8.5.0
+				 * @return array
+				 */
+				$overrides = apply_filters( 'github_updater_override_dot_org', [] );
+				if ( isset( $transient->response[ $theme->slug ] ) && in_array( $theme->slug, $overrides, true ) ) {
+					unset( $transient->response[ $theme->slug ] );
+				}
 			}
 
 			// Set transient for rollback.
-			if ( $this->tag &&
-				( isset( $_GET['theme'], $_GET['rollback'] ) && $theme->repo === $_GET['theme'] )
+			if ( isset( $_GET['theme'], $_GET['rollback'] ) && $theme->slug === $_GET['theme']
 			) {
-				$transient->response[ $theme->repo ] = $this->set_rollback_transient( 'theme', $theme );
+				$transient->response[ $theme->slug ] = $this->set_rollback_transient( 'theme', $theme );
 			}
 		}
 

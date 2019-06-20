@@ -45,6 +45,8 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		 * Delete profile avatar AJAX handler
 		 */
 		function ajax_delete_profile_photo() {
+			UM()->check_ajax_nonce();
+
 			/**
 			 * @var $user_id
 			 */
@@ -61,6 +63,8 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		 * Delete cover photo AJAX handler
 		 */
 		function ajax_delete_cover_photo() {
+			UM()->check_ajax_nonce();
+
 			/**
 			 * @var $user_id
 			 */
@@ -76,7 +80,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		/**
 		 * All tab data
 		 *
-		 * @return mixed|void
+		 * @return array
 		 */
 		function tabs() {
 
@@ -141,7 +145,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		/**
 		 * Tabs that are active
 		 *
-		 * @return mixed|void
+		 * @return array
 		 */
 		function tabs_active() {
 			$tabs = $this->tabs();
@@ -161,7 +165,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		 *
 		 * @return array
 		 */
-		function tabs_primary(){
+		function tabs_primary() {
 			$tabs = $this->tabs();
 			$primary = array();
 			foreach ( $tabs as $id => $info ) {
@@ -178,16 +182,16 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		 *
 		 * @return string
 		 */
-		function tabs_enabled(){
+		function tabs_enabled() {
 			$tabs = $this->tabs();
-			foreach( $tabs as $id => $info ){
+			foreach ( $tabs as $id => $info ) {
 				if ( isset( $info['name'] ) ) {
-					if ( UM()->options()->get('profile_tab_'.$id) || isset( $info['_builtin'] ) ) {
-						$primary[$id] = $info['name'];
+					if ( UM()->options()->get( 'profile_tab_' . $id ) || isset( $info['_builtin'] ) ) {
+						$primary[ $id ] = $info['name'];
 					}
 				}
 			}
-			return ( isset( $primary ) ) ? $primary : '';
+			return isset( $primary ) ? $primary : '';
 		}
 
 
@@ -218,7 +222,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		 */
 		function can_view_tab( $tab ) {
 
-			$target_id = UM()->user()->target_id;
+			$target_id = (int) UM()->user()->target_id;
 			if ( empty( $target_id ) ) {
 				return true;
 			}
@@ -266,7 +270,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		/**
 		 * Get active_tab
 		 *
-		 * @return mixed|void
+		 * @return string
 		 */
 		function active_tab() {
 
@@ -306,7 +310,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 		/**
 		 * Get active active_subnav
 		 *
-		 * @return mixed|null
+		 * @return string|null
 		 */
 		function active_subnav() {
 
@@ -333,7 +337,7 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 				foreach ( $array as $key ) {
 					if ( $key ) {
 						$data = array();
-						if ( isset( UM()->builtin()->all_user_fields[ $key ] ) ){
+						if ( isset( UM()->builtin()->all_user_fields[ $key ] ) ) {
 							$data = UM()->builtin()->all_user_fields[ $key ];
 						}
 
@@ -390,5 +394,36 @@ if ( ! class_exists( 'um\core\Profile' ) ) {
 
 			<?php
 		}
+
+
+		/**
+		 * UM Placeholders for user link, avatar link
+		 *
+		 * @param $placeholders
+		 *
+		 * @return array
+		 */
+		function add_placeholder( $placeholders ) {
+			$placeholders[] = '{user_profile_link}';
+			$placeholders[] = '{user_avatar_url}';
+			$placeholders[] = '{password}';
+			return $placeholders;
+		}
+
+
+		/**
+		 * UM Replace Placeholders for user link, avatar link
+		 *
+		 * @param $replace_placeholders
+		 *
+		 * @return array
+		 */
+		function add_replace_placeholder( $replace_placeholders ) {
+			$replace_placeholders[] = um_get_user_avatar_url();
+			$replace_placeholders[] = um_user_profile_url();
+			$replace_placeholders[] = esc_html__( 'Your set password', 'ultimate-member' );
+			return $replace_placeholders;
+		}
+
 	}
 }

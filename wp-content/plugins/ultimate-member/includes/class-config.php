@@ -149,6 +149,7 @@ if ( ! class_exists( 'um\Config' ) ) {
 				'_um_profile_photo' => '1',
 				'_um_cover_photos' => '1',
 				'_um_show_name' => '1',
+				'_um_search_filters' => '',
 				'_um_directory_header' => __('{total_users} Members','ultimate-member'),
 				'_um_directory_header_single' => __('{total_users} Member','ultimate-member'),
 				'_um_directory_no_users' => __('We are sorry. We cannot find any users who match your search criteria.','ultimate-member'),
@@ -497,6 +498,7 @@ if ( ! class_exists( 'um\Config' ) ) {
 				'account_name_disable'                  => 0,
 				'account_name_require'                  => 1,
 				'account_email'                         => 1,
+				'account_general_password'              => 0,
 				'account_hide_in_directory'             => 1,
 				'account_require_strongpass'            => 0,
 				'photo_thumb_sizes'                     => array( 40, 80, 190 ),
@@ -506,6 +508,10 @@ if ( ! class_exists( 'um\Config' ) ) {
 				'access_exclude_uris'                   => array(),
 				'home_page_accessible'                  => 1,
 				'category_page_accessible'              => 1,
+				'restricted_access_message'             => '',
+				'restricted_blocks'                     => 0,
+				'enable_blocks'                         => 0,
+				'restricted_block_message'              => '',
 				'enable_reset_password_limit'           => 1,
 				'reset_password_limit_number'           => 3,
 				'blocked_emails'                        => '',
@@ -529,6 +535,8 @@ if ( ! class_exists( 'um\Config' ) ) {
 				'profile_photo_max_size'                => 999999999,
 				'cover_photo_max_size'                  => 999999999,
 				'custom_roles_increment'                => 1,
+				'um_profile_object_cache_stop'          => 0,
+				'rest_api_version'                      => '2.0'
 			);
 
 			$tabs = UM()->profile()->tabs_primary();

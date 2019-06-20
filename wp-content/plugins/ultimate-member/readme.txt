@@ -4,9 +4,9 @@ Plugin URI: https://ultimatemember.com/
 Contributors: ultimatemember, champsupertramp, nsinelnikov
 Donate link: 
 Tags: community, member, membership, user-profile, user-registration
-Requires at least: 4.1
-Tested up to: 4.9
-Stable tag: 2.0.21
+Requires at least: 4.9
+Tested up to: 5.2
+Stable tag: 2.0.49
 License: GNU Version 2 or Any Later Version
 License URI: http://www.gnu.org/licenses/gpl-3.0.txt
 
@@ -39,7 +39,7 @@ Read about all of the plugin's features at [Ultimate Member](https://ultimatemem
 
 = Paid Extensions =
 
-Ultimate Member has a range of extensions that allow you to extend the power of the plugin
+Ultimate Member has a range of extensions that allow you to extend the power of the plugin. You can purchase all of these extensions at a significant discount with our [All Access Pass](https://ultimatemember.com/pricing/) or you can purchase extensions individually.
 
 * [Private Content](https://ultimatemember.com/extensions/private-content/) - Display private content to logged in users that only they can access
 * [Instagram](https://ultimatemember.com/extensions/instagram/) - Allow users to show their Instagram photos on their profile
@@ -58,12 +58,18 @@ Ultimate Member has a range of extensions that allow you to extend the power of 
 * [Notices](https://ultimatemember.com/extensions/notices/) - Alert users to important information using conditional notices
 * [Profile Completeness](https://ultimatemember.com/extensions/profile-completeness/) - Encourage or force users to complete their profiles with the profile completeness extension
 * [Friends](https://ultimatemember.com/extensions/friends/) - Allows users to become friends by sending & accepting/rejecting friend requests
+* [User Photos](https://ultimatemember.com/extensions/user-photos/) - Allow users to upload photos to their profile
+* [Groups](https://ultimatemember.com/extensions/groups/) - Allow users to create and join groups around shared topics, interests etc.
 
 = Free Extensions =
 
 * [Terms & Conditions](https://ultimatemember.com/extensions/terms-conditions/) - Add a terms and condition checkbox to your registration forms & require users to agree to your T&Cs before registering on your site.
 * [Google reCAPTCHA](https://ultimatemember.com/extensions/google-recaptcha/) - Stop bots on your registration & login forms with Google reCAPTCHA
 * [Online Users](https://ultimatemember.com/extensions/online-users/) - Display what users are online with this extension
+
+= Theme =
+
+Our official [theme](https://ultimatemember.com/theme/) is purpose built for websites that have logged in and out users. The [theme](https://ultimatemember.com/theme/) has deep integration with Ultimate Member plugin and the extensions, different header designs for logged-in/out users and works alongside the Beaver Builder and Elementor page builders.
 
 = Development * Translations =
 
@@ -122,14 +128,296 @@ The plugin works with popular caching plugins by automatically excluding Ultimat
 10. Screenshot 10
 11. Screenshot 11
 12. Screenshot 12
-13. Screenshot 13
-14. Screenshot 14
-15. Screenshot 15
-16. Screenshot 16
 
 == Changelog ==
 
 = Important: UM2.0+ is a significant update to the code base from 1.3.88. Please make sure you take a full-site backup with restore point before updating the plugin =
+
+= 2.0.49: May 29, 2019 =
+
+* Enhancements:
+  - Extended hooks for 3rd party integrations
+
+* Bugfixes:
+  - Fixed security vulnerability with registration form
+  - Fixed the using of deprecated send password hook
+
+= 2.0.48: May 16, 2019 =
+
+* Enhancements:
+  - Added an ability to 3rd party integration with cover image actions
+
+* Bugfixes:
+  - Fixed ability to edit profile on not predefined Profile Page
+
+= 2.0.47: May 14, 2019 =
+
+* Bugfixes:
+  - Fixed save special characters values
+  - Fixed trim fields options before validation
+  - Fixed save empty value at Profile Registration form in radio/checkbox/select/multiselect fields
+  - Fixed displaying empty value of multiselect field at Profile Page
+  - Fixed cover photo dropdown menus
+
+= 2.0.46: May 10, 2019 =
+
+* Bugfixes:
+  - Fixed extensions' upgrader
+  - Security vulnerabilities on Profile/Registration submit and file/images uploading
+  - Fixed session clean on logout
+
+= 2.0.45: May 08, 2019 =
+
+* Bugfixes:
+  - Fixed issues with Gutenberg scripts and UM blocks
+  - Security vulnerabilities on Profile/Registration submit and file/images uploading
+
+= 2.0.44: May 08, 2019 =
+
+* Enhancements:
+  - Added automatically template saver when you upgrade your theme
+  - Added default value for Date and Time user profile fields
+  - Updated Scroll library
+  - Added REST API v2 class with new query vars. There is an ability to select v1 or v2 for use. For old users v1 is default, for new users v2
+
+* Bugfixes:
+  - Added nocache headers to reset password form
+  - Email templates saving to child theme, if parent theme already has email template files
+  - Email templates locate in the default plugin folder with active WPML
+  - Form builder with some predefined form fields, which had different keys/metakeys (currently use the same)
+  - Logout redirect with active WPML
+  - Fixed $_SERVER usage when WP-CLI using
+  - Extended integration for UM field value
+  - um_user function avoid loop when 'display name' and 'full name' used
+  - Restriction options for Terms and access on front-end
+  - Plugin/Theme upgrader
+  - Remove duplicate data 'user_login' from metadata
+  - Replace placeholders duplicates
+  - Password Reset link regeneration
+  - Fixed issues with scroll on mobile devices
+  - Fixed multisite activation
+
+* Deprecated:
+  - "Is Account page?" and "Is User page?" options for WPML integration ( because WPML translations works properly )
+
+= 2.0.43: March 29, 2019 =
+
+* Bugfixes:
+  - Fixed Last Login order in Member Directory
+
+= 2.0.42: March 28, 2019 =
+
+* Enhancements:
+  - Added option for enable/disable Gutenberg blocks
+
+* Bugfixes:
+  - Fixed conflicts with themes, which not support custom Gutenberg blocks via the option
+
+= 2.0.41: March 27, 2019 =
+
+* Enhancements:
+  - Added Gutenberg blocks section with Ultimate Member shortcodes
+  - Clear temp directory on upload process 1 day files old
+  - Updated custom scrollbar JS library to jQuery 3 support
+
+* Bugfixes:
+  - Fixed vulnerability with Reset Password form
+  - Fixed Edit Row settings
+  - Fixed save profile fields with 0 values
+  - Fixed upload photo base URL for Windows servers
+  - Fixed displaying user Posts at Profile/Posts tab
+  - Fixed unique filename issue, upload avatar with high case extension
+  - Fixed member directory filter title
+  - Fixed duplicate delete user handler
+  - Fixed sorting by Last Login date for users without meta
+  - Fixed hook after password reset (issue #532)
+  - Fixed member directory user role filter
+  - Fixed restriction content WC Products integration
+  - Fixed words count for French in user description field
+  - Fixed is_selected function for dropdown/multi-select/checkbox profile fields
+  - Fixed disable email field at Edit Profile form via filter (disabled by default)
+
+= 2.0.40: March 12, 2019 =
+
+* Bugfixes:
+  - Fixed security issue on user Account Update
+
+= 2.0.39: February 11, 2019 =
+
+* Enhancements:
+  - Restored option for disable users cache
+  - Transposh plugin integration
+
+* Bugfixes:
+  - Fixed delete users handlers on single/multisite installs
+  - Fixed fields labels on member directory
+  - Fixed profile form cover photo ratio value
+  - Fixed profile and registration form default field's values
+  - Fixed "is_selected" function with empty value and default value option
+  - Fixed member directory notices with disabled metadata
+  - Fixed textarea profile field formatting
+  - Fixed registration without username field
+  - Fixed flush password reset limit after successfully login
+  - Fixed upload files handlers for avoid the conflicts with other plugins
+
+= 2.0.38: January 10, 2019 =
+
+* Enhancements:
+  - Added option to enable Gutenberg Blocks restriction
+
+= 2.0.37: January 8, 2019 =
+
+* Enhancements:
+  - Additional Block's restriction options
+  - Added column to show User Account Status
+  - Added filter for disabling Gutenberg blocks restriction to avoid themes conflicts
+
+= 2.0.36: January 7, 2019 =
+
+* Enhancements:
+  - Added Block's restriction options
+  - Added compatibility for upcoming User Events extension
+
+* Bugfixes:
+  - Fixed Live Preview form at wp-admin
+  - Fixed tinyMCE editor loading in form builder
+  - Fixed external function for dropdown options
+  - Fixed Add New Menu Item handler
+  - Fixed small notices at frontend
+  - Fixed a few admin settings fields
+  - Fixed displaying comments when they are disabled
+
+= 2.0.35: December 9, 2018 =
+
+* Bugfixes:
+  - Fixed JS/CSS enqueue at wp-admin
+
+= 2.0.34: December 7, 2018 =
+
+* Enhancements:
+  - Added new "Extensions" class for future integrations
+
+* Bugfixes:
+  - Fixed logout redirect vulnerability
+  - Fixed modal window responsive position
+  - Fixed class autoloader for Windows servers
+  - Fixed admin forms integration
+  - Fixed empty value for select2 selectbox
+  - Fixed unchecked Remember Me by default on login page
+  - Fixed admin forms esc_attr value
+  - Fixed admin forms buttons wp_unslash
+  - Fixed get/clean plugin upgrades on multisites
+  - Fixed verify nonce on $_GET requests
+
+* Deprecated:
+  - removed "UM_TEXTDOMAIN" constant
+  - removed function UM()->get_ajax_route() for AJAX vulnerability fix
+
+= 2.0.33: November 22, 2018 =
+
+* Bugfixes:
+  - Fixed AJAX vulnerabilities
+  - Fixed delete user email notification
+  - Fixed profile tabs displaying
+
+= 2.0.32: November 20, 2018 =
+
+* Bugfixes:
+  - Added compatibility with PHP7.2 (removed deprecated functions and ini variables)
+  - Fixed duplicated "redirect_to" field
+  - Fixed errors on the installs < PHP5.6
+  - Fixed download files/images on the installs with the different home URL and site URL
+  - Fixed unique emails in admin email notifications
+  - Remove language notice, all translates are available on wp.org
+
+= 2.0.31: November 14, 2018 =
+
+* Bugfixes:
+  - Fixed compatibility with JS/CSS cache plugins
+
+= 2.0.30: November 12, 2018 =
+
+* Bugfixes:
+  - Fixed crop settings of the big images
+  - Fixed WPML integration with email notifications
+  - Fixed uppercase symbols using at profile page slug
+  - Fixed download files/images with cache
+  - Fixed download files/images with not closed buffers
+  - Fixed looping in case if set 'display_name' as custom fields for display name setting
+  - Fixed cover photo size
+  - Fixed date time internalization
+  - Fixed posts pagination for un-logged users
+  - Fixed conditional JS
+  - Fixed "um_" prefix for role data
+  - Added compatibility for upcoming User Bookmarks extension
+
+= 2.0.29: October 8, 2018 =
+
+* Bugfixes:
+  - Fixed User Profile Posts pagination
+
+= 2.0.28: October 5, 2018 =
+
+* Bugfixes:
+  - Fixed Email notifications
+  - Fixed Download files/images for multisites
+  - Fixed Profile/Cover image for multisites
+  - Fixed XSS vulnerabilities (detected by @Serhack)
+  - Fixed trim fields on submit forms
+  - Fixed submitted info
+
+= 2.0.27: October 2, 2018 =
+
+* Bugfixes:
+  - Fixed files class
+
+= 2.0.26: October 2, 2018 =
+
+* Enhancements:
+  - New files/images downloading process
+  - Added dependencies with User Photos and Groups extensions
+
+* Bugfixes:
+  - File/Image email placeholders after registration form submitting
+  - File/Image forms fields values on submit/edit
+  - Fixed multisite file/image upload process
+  - Fixed clearing old user sessions after the changing a password
+  - Made reset password process via WP native functions
+
+= 2.0.25: August 20, 2018 =
+
+* Enhancements:
+  - Upgrade minified scripts
+
+= 2.0.24: August 15, 2018 =
+
+* Bugfixes:
+  - WP native AJAX using
+  - Force purge temp files dir
+
+= 2.0.23: August 10, 2018 =
+
+* Bugfixes:
+  - Fixed File/Image uploader
+
+= 2.0.22: August 9, 2018 =
+
+* Enhancements:
+  - Added an ability to filter user's profile slug "um_change_user_profile_slug"
+  - Added an ability to filter pages for exclude restriction content settings "um_exclude_posts_from_privacy"
+
+* Bugfixes:
+  - Fixed callback functions in member directory search
+  - Fixed Profile Privacy Settings for different languages
+  - Fixed security vulnerabilities (File/Image uploader)
+  - Fixed security vulnerabilities (HTML arguments)
+  - Fixed search in members directory for some cases, when metadata format isn't correct
+  - Fixed some cases in conditional logic
+  - Fixed WP Capabilities list for Gravity Forms
+  - Fixed View Profile capabilities
+
+* Deprecated:
+  - Filters "um_before_user_upload", "um_after_user_upload"
 
 = 2.0.21: July 9, 2018 =
 

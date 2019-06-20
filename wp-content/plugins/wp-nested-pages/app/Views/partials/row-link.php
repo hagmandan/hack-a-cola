@@ -49,12 +49,13 @@ $link = ( $this->post->nav_type && $this->post->nav_type !== 'custom' )
 
 		<div class="action-buttons">
 
+			<?php if ( in_array('quickedit', $this->post_type_settings->row_actions) ) : ?>
 			<a href="#" 
 				class="np-btn np-quick-edit-redirect" 
 				data-id="<?php echo esc_attr($this->post->id); ?>" 
 				data-parentid="<?php echo esc_attr($this->post->parent_id); ?>"
 				data-title="<?php echo esc_attr($this->post->title); ?>" 
-				data-url="<?php echo esc_attr(NestedPages\Helpers::check_url($this->post->content)); ?>"
+				data-url="<?php echo esc_url($this->post->content); ?>"
 				data-status="<?php echo esc_attr($this->post->status); ?>" 
 				data-np-status="<?php echo esc_attr($this->post->np_status); ?>"
 				data-navstatus="<?php echo esc_attr($this->post->nav_status); ?>"
@@ -68,8 +69,9 @@ $link = ( $this->post->nav_type && $this->post->nav_type !== 'custom' )
 				data-linktarget="<?php echo esc_attr($this->post->link_target); ?>">
 				<?php _e('Quick Edit', 'wp-nested-pages'); ?>
 			</a>
+			<?php endif; ?>
 
-			<?php if ( current_user_can('delete_pages') ) : ?>
+			<?php if ( current_user_can('delete_pages') && in_array('trash', $this->post_type_settings->row_actions) ) : ?>
 			<a href="<?php echo get_delete_post_link($this->post->id, '', true); ?>" class="np-btn np-btn-trash" data-np-confirm-delete>
 				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="np-icon-remove"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" class="icon"/><path d="M0 0h24v24H0z" fill="none"/></svg>
 			</a>

@@ -13,7 +13,6 @@ namespace Fragen\GitHub_Updater\API;
 use Fragen\Singleton;
 use Fragen\GitHub_Updater\API;
 use Fragen\GitHub_Updater\Branch;
-use Fragen\GitHub_Updater\Readme_Parser;
 
 /*
  * Exit if called directly.
@@ -99,27 +98,7 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_info( $file ) {
-		$response = isset( $this->response[ $file ] ) ? $this->response[ $file ] : false;
-
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/repositories/:owner/:repo/src/:branch/' . $file );
-
-			if ( $response && isset( $response->data ) ) {
-				$contents = $response->data;
-				$response = $this->get_file_headers( $contents, $this->type->type );
-				$this->set_repo_cache( $file, $response );
-				$this->set_repo_cache( 'repo', $this->type->repo );
-			}
-		}
-
-		if ( ! is_array( $response ) || $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$response['dot_org'] = $this->get_dot_org_data();
-		$this->set_file_info( $response );
-
-		return true;
+		return $this->get_remote_api_info( 'bitbucket', $file, "/2.0/repositories/:owner/:repo/src/:branch/{$file}" );
 	}
 
 	/**
@@ -130,32 +109,7 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_tag() {
-		$repo_type = $this->return_repo_type();
-		$response  = isset( $this->response['tags'] ) ? $this->response['tags'] : false;
-
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/repositories/:owner/:repo/tags' );
-			$arr_resp = (array) $response;
-
-			if ( ! $response || ! $arr_resp ) {
-				$response          = new \stdClass();
-				$response->message = 'No tags found';
-			}
-
-			if ( $response ) {
-				$response = $this->parse_tag_response( $response );
-				$this->set_repo_cache( 'tags', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$tags = $this->parse_tags( $response, $repo_type );
-		$this->sort_tags( $tags );
-
-		return true;
+		return $this->get_remote_api_tag( 'bitbucket', '/2.0/repositories/:owner/:repo/refs/tags' );
 	}
 
 	/**
@@ -168,46 +122,7 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_changes( $changes ) {
-		$response = isset( $this->response['changes'] ) ? $this->response['changes'] : false;
-
-		/*
-		 * Set $response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = [];
-			$content  = $this->get_local_info( $this->type, $changes );
-			if ( $content ) {
-				$response['changes'] = $content;
-				$this->set_repo_cache( 'changes', $response );
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/repositories/:owner/:repo/src/:branch/' . $changes );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No changelog found';
-			}
-
-			if ( $response ) {
-				$response = $this->parse_changelog_response( $response );
-				$this->set_repo_cache( 'changes', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$parser    = new \Parsedown();
-		$changelog = $parser->text( $response['changes'] );
-
-		$this->type->sections['changelog'] = $changelog;
-
-		return true;
+		return $this->get_remote_api_changes( 'bitbucket', $changes, "/2.0/repositories/:owner/:repo/src/:branch/{$changes}" );
 	}
 
 	/**
@@ -216,48 +131,7 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_readme() {
-		if ( ! $this->local_file_exists( 'readme.txt' ) ) {
-			return false;
-		}
-
-		$response = isset( $this->response['readme'] ) ? $this->response['readme'] : false;
-
-		/*
-		 * Set $response from local file if no update available.
-		 */
-		if ( ! $response && ! $this->can_update_repo( $this->type ) ) {
-			$response = new \stdClass();
-			$content  = $this->get_local_info( $this->type, 'readme.txt' );
-			if ( $content ) {
-				$response->data = $content;
-			} else {
-				$response = false;
-			}
-		}
-
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/repositories/:owner/:repo/src/:branch/' . 'readme.txt' );
-
-			if ( ! $response ) {
-				$response          = new \stdClass();
-				$response->message = 'No readme found';
-			}
-		}
-
-		if ( $response && isset( $response->data ) ) {
-			$file     = $response->data;
-			$parser   = new Readme_Parser( $file );
-			$response = $parser->parse_data();
-			$this->set_repo_cache( 'readme', $response );
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->set_readme_info( $response );
-
-		return true;
+		return $this->get_remote_api_readme( 'bitbucket', '/2.0/repositories/:owner/:repo/src/:branch/readme.txt' );
 	}
 
 	/**
@@ -266,25 +140,7 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_repo_meta() {
-		$response = isset( $this->response['meta'] ) ? $this->response['meta'] : false;
-
-		if ( ! $response ) {
-			$response = $this->api( '/2.0/repositories/:owner/:repo' );
-
-			if ( $response ) {
-				$response = $this->parse_meta_response( $response );
-				$this->set_repo_cache( 'meta', $response );
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->repo_meta = $response;
-		$this->add_meta_repo_object();
-
-		return true;
+		return $this->get_remote_api_repo_meta( 'bitbucket', '/2.0/repositories/:owner/:repo' );
 	}
 
 	/**
@@ -293,64 +149,41 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return bool
 	 */
 	public function get_remote_branches() {
-		$branches = [];
-		$response = isset( $this->response['branches'] ) ? $this->response['branches'] : false;
+		return $this->get_remote_api_branches( 'bitbucket', '/2.0/repositories/:owner/:repo/refs/branches' );
+	}
 
-		if ( $this->exit_no_update( $response, true ) ) {
-			return false;
-		}
-
-		if ( ! $response ) {
-			$response = $this->api( '/1.0/repositories/:owner/:repo/branches' );
-
-			if ( $response ) {
-				foreach ( $response as $branch => $api_response ) {
-					$branches[ $branch ] = $this->construct_download_link( false, $branch );
-				}
-				$this->type->branches = $branches;
-				$this->set_repo_cache( 'branches', $branches );
-
-				return true;
-			}
-		}
-
-		if ( $this->validate_response( $response ) ) {
-			return false;
-		}
-
-		$this->type->branches = $response;
-
-		return true;
+	/**
+	 * Return the Bitbucket release asset URL.
+	 *
+	 * @return string
+	 */
+	public function get_release_asset() {
+		return $this->get_api_release_asset( 'bitbucket', '/2.0/repositories/:owner/:repo/downloads' );
 	}
 
 	/**
 	 * Construct $this->type->download_link using Bitbucket API
 	 *
-	 * @param boolean $rollback      For theme rollback. Defaults to false.
 	 * @param boolean $branch_switch For direct branch changing. Defaults to false.
 	 *
 	 * @return string $endpoint
 	 */
-	public function construct_download_link( $rollback = false, $branch_switch = false ) {
+	public function construct_download_link( $branch_switch = false ) {
+		self::$method       = 'download_link';
 		$download_link_base = $this->get_api_url( '/:owner/:repo/get/', true );
 		$endpoint           = '';
 
+		// Release asset.
 		if ( $this->type->release_asset && '0.0.0' !== $this->type->newest_tag ) {
-			return $this->make_release_asset_download_link();
+			$release_asset = $this->get_release_asset();
+			return $this->get_release_asset_redirect( $release_asset, true );
 		}
 
 		/*
-		 * Check for rollback.
+		 * If a branch has been given, use branch.
+		 * If branch is master (default) and tags are used, use newest tag.
 		 */
-		if ( ! empty( $_GET['rollback'] ) &&
-			( isset( $_GET['action'], $_GET['theme'] ) &&
-			'upgrade-theme' === $_GET['action'] &&
-			$this->type->repo === $_GET['theme'] )
-		) {
-			$endpoint .= $rollback . '.zip';
-
-			// For users wanting to update against branch other than master or not using tags, else use newest_tag.
-		} elseif ( 'master' !== $this->type->branch || empty( $this->type->tags ) ) {
+		if ( 'master' !== $this->type->branch || empty( $this->type->tags ) ) {
 			if ( ! empty( $this->type->enterprise_api ) ) {
 				$endpoint = add_query_arg( 'at', $this->type->branch, $endpoint );
 			} else {
@@ -375,33 +208,23 @@ class Bitbucket_API extends API implements API_Interface {
 			}
 		}
 
-		return $download_link_base . $endpoint;
+		$download_link = $download_link_base . $endpoint;
+
+		/**
+		 * Filter download link so developers can point to specific ZipFile
+		 * to use as a download link during a branch switch.
+		 *
+		 * @since 8.8.0
+		 *
+		 * @param string    $download_link Download URL.
+		 * @param /stdClass $this->type    Repository object.
+		 * @param string    $branch_switch Branch or tag for rollback or branch switching.
+		 */
+		return apply_filters( 'github_updater_post_construct_download_link', $download_link, $this->type, $branch_switch );
 	}
 
 	/**
-	 * Create release asset download link.
-	 * Filename must be `{$slug}-{$newest_tag}.zip`
-	 *
-	 * @access private
-	 *
-	 * @return string $download_link
-	 */
-	private function make_release_asset_download_link() {
-		$download_link = implode(
-			'/', [
-				'https://bitbucket.org',
-				$this->type->owner,
-				$this->type->repo,
-				'downloads',
-				$this->type->repo . '-' . $this->type->newest_tag . '.zip',
-			]
-		);
-
-		return $download_link;
-	}
-
-	/**
-	 * Added due to interface contract, not used for Bitbucket.
+	 * Create Bitbucket API endpoints.
 	 *
 	 * @param Bitbucket_API|API $git
 	 * @param string            $endpoint
@@ -409,6 +232,32 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return string|void $endpoint
 	 */
 	public function add_endpoints( $git, $endpoint ) {
+		switch ( $git::$method ) {
+			case 'file':
+			case 'readme':
+			case 'meta':
+			case 'changes':
+			case 'translation':
+			case 'release_asset':
+			case 'download_link':
+				break;
+			case 'tags':
+			case 'branches':
+				$endpoint = add_query_arg(
+					[
+						'pagelen' => '100',
+						'sort'    => '-name',
+					],
+					$endpoint
+				);
+				break;
+			default:
+				break;
+		}
+
+		$endpoint = $this->add_access_token_endpoint( $git, $endpoint );
+
+		return $endpoint;
 	}
 
 	/**
@@ -419,11 +268,21 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return array|\stdClass Array of tag numbers, object is error.
 	 */
 	public function parse_tag_response( $response ) {
-		if ( isset( $response->message ) ) {
+		if ( ! isset( $response->values ) || $this->validate_response( $response ) ) {
 			return $response;
 		}
 
-		return array_keys( (array) $response );
+		$arr = [];
+		array_map(
+			function ( $e ) use ( &$arr ) {
+				$arr[] = $e->name;
+
+				return $arr;
+			},
+			(array) $response->values
+		);
+
+		return $arr;
 	}
 
 	/**
@@ -434,11 +293,15 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return array $arr Array of meta variables.
 	 */
 	public function parse_meta_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
+			return $response;
+		}
 		$arr      = [];
 		$response = [ $response ];
 
 		array_filter(
-			$response, function ( $e ) use ( &$arr ) {
+			$response,
+			function ( $e ) use ( &$arr ) {
 				$arr['private']      = $e->is_private;
 				$arr['last_updated'] = $e->updated_on;
 				$arr['watchers']     = 0;
@@ -458,27 +321,33 @@ class Bitbucket_API extends API implements API_Interface {
 	 * @return array|\stdClass $arr Array of changes in base64, object if error.
 	 */
 	public function parse_changelog_response( $response ) {
-		if ( isset( $response->message ) ) {
+	}
+
+	/**
+	 * Parse API response and return array of branch data.
+	 *
+	 * @param \stdClass $response API response.
+	 *
+	 * @return array Array of branch data.
+	 */
+	public function parse_branch_response( $response ) {
+		if ( $this->validate_response( $response ) ) {
 			return $response;
 		}
-
-		$arr      = [];
-		$response = [ $response ];
-
-		array_filter(
-			$response, function ( $e ) use ( &$arr ) {
-				$arr['changes'] = $e->data;
-			}
-		);
-
-		return $arr;
+		$branches = [];
+		foreach ( $response as $branch ) {
+			$branches[ $branch->name ]['download']         = $this->construct_download_link( $branch->name );
+			$branches[ $branch->name ]['commit_hash']      = $branch->target->hash;
+			$branches[ $branch->name ]['commit_timestamp'] = $branch->target->date;
+		}
+		return $branches;
 	}
 
 	/**
 	 * Parse tags and create download links.
 	 *
-	 * @param $response
-	 * @param $repo_type
+	 * @param \stdClass|array $response Response from API call.
+	 * @param string          $repo_type
 	 *
 	 * @return array
 	 */
@@ -487,14 +356,16 @@ class Bitbucket_API extends API implements API_Interface {
 		$rollback = [];
 
 		foreach ( (array) $response as $tag ) {
-			$download_base    = implode(
-				'/', [
-					$repo_type['base_download'],
-					$this->type->owner,
-					$this->type->repo,
-					'get/',
-				]
-			);
+			// $download_base    = implode(
+			// '/',
+			// [
+			// $repo_type['base_download'],
+			// $this->type->owner,
+			// $this->type->owner,
+			// 'get/',
+			// ]
+			// );
+			$download_base    = "{$repo_type['base_download']}/{$this->type->owner}/{$this->type->owner}/get/";
 			$tags[]           = $tag;
 			$rollback[ $tag ] = $download_base . $tag . '.zip';
 		}
@@ -572,7 +443,8 @@ class Bitbucket_API extends API implements API_Interface {
 	 */
 	private function add_settings_subtab() {
 		add_filter(
-			'github_updater_add_settings_subtabs', function ( $subtabs ) {
+			'github_updater_add_settings_subtabs',
+			function ( $subtabs ) {
 				return array_merge( $subtabs, [ 'bitbucket' => esc_html__( 'Bitbucket', 'github-updater' ) ] );
 			}
 		);
@@ -636,7 +508,7 @@ class Bitbucket_API extends API implements API_Interface {
 	public function is_private_repo() {
 		?>
 		<label for="is_private">
-			<input class="bitbucket_setting" type="checkbox" name="is_private" <?php checked( '1', false ); ?> >
+			<input class="bitbucket_setting" type="checkbox" id="is_private" name="is_private" <?php checked( '1', false ); ?> >
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'Check for private Bitbucket repositories.', 'github-updater' ); ?>
@@ -651,7 +523,7 @@ class Bitbucket_API extends API implements API_Interface {
 	public function bitbucket_username() {
 		?>
 		<label for="bitbucket_username">
-			<input class="bitbucket_setting" type="text" style="width:50%;" name="bitbucket_username" value="">
+			<input class="bitbucket_setting" type="text" style="width:50%;" id="bitbucket_username" name="bitbucket_username" value="">
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'Enter Bitbucket username.', 'github-updater' ); ?>
@@ -666,7 +538,7 @@ class Bitbucket_API extends API implements API_Interface {
 	public function bitbucket_password() {
 		?>
 		<label for="bitbucket_password">
-			<input class="bitbucket_setting" type="password" style="width:50%;" name="bitbucket_password" value="">
+			<input class="bitbucket_setting" type="password" style="width:50%;" id="bitbucket_password" name="bitbucket_password" value="" autocomplete="new-password">
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'Enter Bitbucket password.', 'github-updater' ); ?>
@@ -695,14 +567,7 @@ class Bitbucket_API extends API implements API_Interface {
 		}
 
 		if ( $bitbucket_org ) {
-			$install['download_link'] = implode(
-				'/', [
-					$base,
-					$install['github_updater_repo'],
-					'get',
-					$install['github_updater_branch'] . '.zip',
-				]
-			);
+			$install['download_link'] = "{$base}/{$install['github_updater_repo']}/get/{$install['github_updater_branch']}.zip";
 			if ( isset( $install['is_private'] ) ) {
 				$install['options'][ $install['repo'] ] = 1;
 			}

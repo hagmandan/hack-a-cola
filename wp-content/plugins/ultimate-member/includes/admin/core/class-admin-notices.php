@@ -31,14 +31,13 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 			add_action( 'admin_notices', array( &$this, 'render_notices' ), 1 );
 
 			add_action( 'wp_ajax_um_dismiss_notice', array( &$this, 'dismiss_notice' ) );
-			add_action( 'wp_ajax_um_opt_in_notice', array( &$this, 'opt_in_notice' ) );
 		}
 
 
 		function create_list() {
 			$this->old_extensions_notice();
-			$this->main_notices();
-			$this->localize_note();
+			$this->install_core_page_notice();
+			$this->exif_extension_notice();
 			$this->show_update_messages();
 			$this->check_wrong_install_folder();
 			$this->admin_notice_opt_in();
@@ -46,7 +45,6 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 			$this->check_wrong_licenses();
 
 			$this->reviews_notice();
-
 
 			//$this->future_changed();
 
@@ -284,40 +282,40 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 
 
 		/**
-		* Show main notices
-		*/
-		function main_notices() {
-
-			$hide_exif_notice = get_option( 'um_hide_exif_notice' );
-
-			if ( ! extension_loaded( 'exif' ) && ! $hide_exif_notice ) {
-				$this->add_notice( 'exif_disabled', array(
-					'class'     => 'updated',
-					'message'   => '<p>' . sprintf(__( 'Exif is not enabled on your server. Mobile photo uploads will not be rotated correctly until you enable the exif extension. <a href="%s">Hide this notice</a>', 'ultimate-member' ), add_query_arg('um_adm_action', 'um_hide_exif_notice') ) . '</p>',
-				), 10 );
-			}
-
-			// Regarding page setup
+		 * Regarding page setup
+		 */
+		function install_core_page_notice() {
 			$pages = UM()->config()->permalinks;
+
 			if ( $pages && is_array( $pages ) ) {
 
-				$err = false;
-
 				foreach ( $pages as $slug => $page_id ) {
-
 					$page = get_post( $page_id );
 
-					if ( ! isset( $page->ID ) && in_array( $slug, array( 'user', 'account', 'members', 'register', 'login', 'logout', 'password-reset' ) ) ) {
-						$err = true;
+					if ( ! isset( $page->ID ) && in_array( $slug, array_keys( UM()->config()->core_pages ) ) ) {
+
+						ob_start(); ?>
+
+						<p>
+							<?php printf( __( '%s needs to create several pages (User Profiles, Account, Registration, Login, Password Reset, Logout, Member Directory) to function correctly.', 'ultimate-member' ), ultimatemember_plugin_name ); ?>
+						</p>
+
+						<p>
+							<a href="<?php echo esc_attr( add_query_arg( 'um_adm_action', 'install_core_pages' ) ); ?>" class="button button-primary"><?php _e( 'Create Pages', 'ultimate-member' ) ?></a>
+							&nbsp;
+							<a href="javascript:void(0);" class="button-secondary um_secondary_dimiss"><?php _e( 'No thanks', 'ultimate-member' ) ?></a>
+						</p>
+
+						<?php $message = ob_get_clean();
+
+						$this->add_notice( 'wrong_pages', array(
+							'class'         => 'updated',
+							'message'       => $message,
+							'dismissible'   => true
+						), 20 );
+
+						break;
 					}
-
-				}
-
-				if ( $err ) {
-					$this->add_notice( 'wrong_pages', array(
-						'class'     => 'updated',
-						'message'   => '<p>' . __( 'One or more of your Ultimate Member pages are not correctly setup. Please visit <strong>Ultimate Member > Settings</strong> to re-assign your missing pages.', 'ultimate-member' ) . '</p>',
-					), 20 );
 				}
 
 				if ( isset( $pages['user'] ) ) {
@@ -345,41 +343,17 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 
 
 		/**
-		 * Localization notice
-		 */
-		function localize_note() {
-			$locale = get_option( 'WPLANG' );
-			if ( ! $locale || strstr( $locale, 'en_' ) ) {
-				return;
-			}
+		* EXIF library notice
+		*/
+		function exif_extension_notice() {
+			$hide_exif_notice = get_option( 'um_hide_exif_notice' );
 
-			if ( file_exists( WP_LANG_DIR . '/plugins/ultimatemember-' . $locale . '.mo' ) ) {
-				return;
-			}
-
-			$hide_locale_notice = get_option( 'um_hide_locale_notice' );
-			if ( $hide_locale_notice ) {
-				return;
-			}
-
-			if ( isset( UM()->available_languages[ $locale ] ) ) {
-
-				$download_uri = add_query_arg( 'um_adm_action', 'um_language_downloader' );
-
-				$this->add_notice( 'locale', array(
+			if ( ! extension_loaded( 'exif' ) && ! $hide_exif_notice ) {
+				$this->add_notice( 'exif_disabled', array(
 					'class'     => 'updated',
-					'message'   => '<p>' . sprintf( __( 'Your site language is <strong>%1$s</strong>. Good news! Ultimate Member is already available in <strong>%2$s language</strong>. <a href="%3$s">Download the translation</a> files and start using the plugin in your language now. <a href="%4$s">Hide this notice</a>','ultimate-member'), $locale, UM()->available_languages[ $locale ], $download_uri, add_query_arg( 'um_adm_action', 'um_hide_locale_notice' ) ) . '</p>',
-				), 40 );
-
-			} else {
-
-				$this->add_notice( 'locale', array(
-					'class'     => 'updated',
-					'message'   => '<p>' . sprintf( __( 'Ultimate Member has not yet been translated to your language: <strong>%1$s</strong>. If you have translated the plugin you need put these files <code>ultimatemember-%1$s.po and ultimatemember-%1$s.mo</code> in <strong>/wp-content/languages/plugins/</strong> for the plugin to be translated in your language. <a href="%2$s">Hide this notice</a>', 'ultimate-member' ), $locale, add_query_arg( 'um_adm_action', 'um_hide_locale_notice' ) ) . '</p>',
-				), 40 );
-
+					'message'   => '<p>' . sprintf(__( 'Exif is not enabled on your server. Mobile photo uploads will not be rotated correctly until you enable the exif extension. <a href="%s">Hide this notice</a>', 'ultimate-member' ), add_query_arg('um_adm_action', 'um_hide_exif_notice') ) . '</p>',
+				), 10 );
 			}
-
 		}
 
 
@@ -430,7 +404,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 					break;
 
 				case 'got_updates':
-					$messages[0]['content'] = __( 'You got the latest upgrades.', 'ultimate-member' );
+					$messages[0]['content'] = __( 'You have the latest updates.', 'ultimate-member' );
 					break;
 
 				case 'often_updates':
@@ -514,22 +488,16 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 				return;
 			}
 
-			$optin_url = esc_url( add_query_arg( 'um_adm_action', 'opt_in' ) );
-
 			ob_start(); ?>
 
 			<p>
-				<?php printf( __( 'Thanks for installing <strong>%s</strong>! We hope you like the plugin. To fund full-time development and support of the plugin we also sell extensions for %s via our website. If you subscribe to our mailing list we will email you a 20%% discount code for our <a href="%s" target="_blank">extensions bundle</a> (you\'ll need to confirm your opt-in via email before the discount code can be sent).', 'ultimate-member' ), ultimatemember_plugin_name, ultimatemember_plugin_name, 'https://ultimatemember.com/core-extensions-bundle/' ); ?>
+				<?php printf( __( 'Thanks for installing <strong>%s</strong>! We hope you like the plugin. To fund full-time development and support of the plugin we also sell extensions. If you subscribe to our mailing list we will send you a 20%% discount code for one of our <a href="%s" target="_blank">access passes</a>.', 'ultimate-member' ), ultimatemember_plugin_name, 'https://ultimatemember.com/pricing/' ); ?>
 			</p>
 
 			<p>
-				<a href="javascript:void(0);" id="um_opt_in_start" class="button button-primary"><?php _e( 'Subscribe to mailing list', 'ultimate-member' ) ?></a>
+				<a href="http://ultimatemember.com/discount/" target="_blank" id="um_opt_in_start" class="button button-primary"><?php _e( 'Claim 20% discount code', 'ultimate-member' ) ?></a>
 				&nbsp;
 				<a href="javascript:void(0);" class="button-secondary um_opt_in_link"><?php _e( 'No thanks', 'ultimate-member' ) ?></a>
-			</p>
-
-			<p class="description" style="font-size: 11px;">
-				<?php printf( __( 'By clicking the subscribe button you are agree to join our mailing list. See our <a href="%s" target="_blank">privacy policy</a>', 'ultimate-member' ), 'https://ultimatemember.com/privacy-policy/' ); ?>
 			</p>
 
 			<?php $message = ob_get_clean();
@@ -566,7 +534,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 			if ( ! empty(  $arr_inactive_license_keys ) ) {
 				$this->add_notice( 'license_key', array(
 					'class'     => 'error',
-					'message'   => '<p>' . sprintf( __( 'There are %d inactive %s license keys for this site. This site is not authorized to get plugin updates. You can active this site on <a href="%s">www.UltimateMember.com</a>.', 'ultimate-member' ), count( $arr_inactive_license_keys ) , ultimatemember_plugin_name, 'https://ultimatemember.com' ) . '</p>',
+					'message'   => '<p>' . sprintf( __( 'There are %d inactive %s license keys for this site. This site is not authorized to get plugin updates. You can active this site on <a href="%s">www.ultimatemember.com</a>.', 'ultimate-member' ), count( $arr_inactive_license_keys ) , ultimatemember_plugin_name, UM()->store_url ) . '</p>',
 				), 3 );
 			}
 
@@ -623,7 +591,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 				return;
 			}
 
-			if ( $first_activation_date + MONTH_IN_SECONDS > time() ) {
+			if ( $first_activation_date + 2*WEEK_IN_SECONDS > time() ) {
 				return;
 			}
 
@@ -698,11 +666,7 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 
 
 		function dismiss_notice() {
-			$nonce = isset( $_POST["nonce"] ) ? $_POST["nonce"] : "";
-			if ( ! wp_verify_nonce( $nonce, "um-admin-nonce" ) ) {
-				wp_send_json_error( esc_js( __( "Wrong Nonce", 'ultimate-member' ) ) );
-			}
-
+			UM()->admin()->check_ajax_nonce();
 
 			if ( empty( $_POST['key'] ) ) {
 				wp_send_json_error( __( 'Wrong Data', 'ultimate-member' ) );
@@ -715,54 +679,5 @@ if ( ! class_exists( 'um\admin\core\Admin_Notices' ) ) {
 
 			wp_send_json_success();
 		}
-
-
-		function opt_in_notice() {
-			$nonce = isset( $_POST["nonce"] ) ? $_POST["nonce"] : "";
-			if ( ! wp_verify_nonce( $nonce, "um-admin-nonce" ) ) {
-				wp_send_json_error( esc_js( __( "Wrong Nonce", 'ultimate-member' ) ) );
-			}
-
-			// Send a maximum of once per period
-			$last_send = get_option( 'um_opt_in_last_send', false );
-			if ( $last_send && $last_send > strtotime( '-1 day' ) ) {
-				return;
-			}
-
-			$data = array();
-
-			UM()->setup()->install_basics();
-
-			$data['email'] = get_option( 'admin_email' );
-			$data['send_discount'] = ! get_option( '__ultimatemember_coupon_sent' ) ? 1 : 0;
-			$data['unique_sitekey'] = get_option( '__ultimatemember_sitekey' );
-
-			$request = wp_remote_post( 'https://ultimatemember.com/?um_action=checkin', array(
-				'method'      => 'POST',
-				'timeout'     => 45,
-				'redirection' => 5,
-				'httpversion' => '1.0',
-				'blocking'    => true,
-				'body'        => $data,
-				'user-agent'  => 'UM/' . ultimatemember_version . '; ' . get_bloginfo( 'url' ),
-			) );
-
-			if ( ! is_wp_error( $request ) ) {
-				$request = json_decode( wp_remote_retrieve_body( $request ), true );
-			}
-
-			$request = ( $request ) ? maybe_unserialize( $request ) : false;
-
-			if ( ! empty( $request['id'] ) && ! empty( $request['list_id'] ) ) {
-				update_option( 'um_opt_in_last_send', time() );
-
-				if ( $request['discount_ready'] ) {
-					update_option( '__ultimatemember_coupon_sent', 1 );
-				}
-			}
-
-			wp_send_json_success();
-		}
-
 	}
 }

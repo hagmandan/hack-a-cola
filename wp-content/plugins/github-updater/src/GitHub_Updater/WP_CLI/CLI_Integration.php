@@ -34,34 +34,8 @@ class CLI_Integration extends WP_CLI_Command {
 	 * Off to the races.
 	 */
 	public function run() {
-		$this->init_plugins();
-		$this->init_themes();
-	}
-
-	/**
-	 * Update plugin update transient for GitHub Updater repositories.
-	 *
-	 * After running your are able to use any of the standard
-	 * `wp plugin` commands with GitHub Updater repositories.
-	 */
-	public function init_plugins() {
-		Singleton::get_instance( 'Base', $this )->get_meta_plugins();
-		$current = get_site_transient( 'update_plugins' );
-		$current = Singleton::get_instance( 'Plugin', $this )->pre_set_site_transient_update_plugins( $current );
-		set_site_transient( 'update_plugins', $current );
-	}
-
-	/**
-	 * Update theme update transient for GitHub Updater repositories.
-	 *
-	 * After running your are able to use any of the standard
-	 * `wp theme` commands with GitHub Updater repositories.
-	 */
-	public function init_themes() {
-		Singleton::get_instance( 'Base', $this )->get_meta_themes();
-		$current = get_site_transient( 'update_themes' );
-		$current = Singleton::get_instance( 'Theme', $this )->pre_set_site_transient_update_themes( $current );
-		set_site_transient( 'update_themes', $current );
+		add_filter( 'site_transient_update_plugins', [ Singleton::get_instance( 'Plugin', $this ), 'update_site_transient' ], 10, 1 );
+		add_filter( 'site_transient_update_themes', [ Singleton::get_instance( 'Theme', $this ), 'update_site_transient' ], 10, 1 );
 	}
 
 	/**
@@ -84,6 +58,9 @@ class CLI_Integration extends WP_CLI_Command {
 	 * [--bitbucket-private]
 	 * : Indicates a private Bitbucket repository
 	 *
+	 * [--slug=<slug>]
+	 * : Optional string indicating the plugin slug
+
 	 * [--github]
 	 * : Optional to denote a GitHub repository
 	 * Required when installing from a self-hosted GitHub installation
@@ -99,6 +76,10 @@ class CLI_Integration extends WP_CLI_Command {
 	 * [--gitea]
 	 * : Optional switch to denote a Gitea repository
 	 * Required when installing from a Gitea installation
+	 *
+	 * [--zipfile]
+	 * : Optional switch to denote a Zipfile
+	 * Required when installing from a Zipfile
 	 *
 	 * ## EXAMPLES
 	 *
@@ -146,6 +127,9 @@ class CLI_Integration extends WP_CLI_Command {
 	 * [--bitbucket-private]
 	 * : Indicates a private Bitbucket repository
 	 *
+	 * [--slug=<slug>]
+	 * : Optional string indicating the theme slug
+	 *
 	 * [--github]
 	 * : Optional to denote a GitHub repository
 	 * Required when installing from a self-hosted GitHub installation
@@ -161,6 +145,10 @@ class CLI_Integration extends WP_CLI_Command {
 	 * [--gitea]
 	 * : Optional switch to denote a Gitea repository
 	 * Required when installing from a Gitea installation
+	 *
+	 * [--zipfile]
+	 * : Optional switch to denote a Zipfile
+	 * Required when installing from a Zipfile
 	 *
 	 * ## EXAMPLES
 	 *
@@ -191,8 +179,8 @@ class CLI_Integration extends WP_CLI_Command {
 	/**
 	 * Process WP-CLI config data.
 	 *
-	 * @param string $uri
-	 * @param array  $assoc_args
+	 * @param string $uri URI to process.
+	 * @param array  $assoc_args Args to process.
 	 *
 	 * @return array $cli_config
 	 */
@@ -202,9 +190,8 @@ class CLI_Integration extends WP_CLI_Command {
 		$cli_config            = [];
 		$cli_config['uri']     = $uri;
 		$cli_config['private'] = $token ?: $bitbucket_private;
-		$cli_config['branch']  = isset( $assoc_args['branch'] )
-			? $assoc_args['branch']
-			: 'master';
+		$cli_config['branch']  = isset( $assoc_args['branch'] ) ? $assoc_args['branch'] : 'master';
+		$cli_config['slug']    = isset( $assoc_args['slug'] ) ? $assoc_args['slug'] : null;
 
 		switch ( $assoc_args ) {
 			case isset( $assoc_args['github'] ):
@@ -219,6 +206,9 @@ class CLI_Integration extends WP_CLI_Command {
 			case isset( $assoc_args['gitea'] ):
 				$cli_config['git'] = 'gitea';
 				break;
+			case isset( $assoc_args['zipfile'] ):
+				$cli_config['git'] = 'zipfile';
+				break;
 		}
 
 		return $cli_config;
@@ -227,8 +217,8 @@ class CLI_Integration extends WP_CLI_Command {
 	/**
 	 * Process branch setting for WP-CLI.
 	 *
-	 * @param array  $cli_config
-	 * @param string $slug
+	 * @param array  $cli_config Config args.
+	 * @param string $slug Repository slug.
 	 */
 	private function process_branch( $cli_config, $slug ) {
 		$branch_data['github_updater_branch'] = $cli_config['branch'];

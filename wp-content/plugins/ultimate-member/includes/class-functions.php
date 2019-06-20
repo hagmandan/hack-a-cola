@@ -1,6 +1,5 @@
-<?php
-// Exit if accessed directly.
-if ( ! defined( 'ABSPATH' ) ) exit;
+<?php if ( ! defined( 'ABSPATH' ) ) exit;
+
 
 if ( ! class_exists( 'UM_Functions' ) ) {
 
@@ -12,22 +11,39 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 
 
 		/**
-		 * @var
+		 * Store URL
+		 *
+		 * @var string
 		 */
-		var $options;
+		var $store_url = 'https://ultimatemember.com/';
 
 
 		/**
-		 * @var array variable for Flags
+		 * WP remote Post timeout
+		 * @var int
 		 */
-		var $screenload_flags;
+		var $request_timeout = 60;
 
 
 		/**
 		 * UM_Functions constructor.
 		 */
 		function __construct() {
-			$this->init_variables();
+		}
+
+
+		/**
+		 * Check frontend nonce
+		 *
+		 * @param bool $action
+		 */
+		function check_ajax_nonce( $action = false ) {
+			$nonce = isset( $_REQUEST['nonce'] ) ? $_REQUEST['nonce'] : '';
+			$action = empty( $action ) ? 'um-frontend-nonce' : $action;
+
+			if ( ! wp_verify_nonce( $nonce, $action ) ) {
+				wp_send_json_error( esc_js( __( 'Wrong Nonce', 'ultimate-member' ) ) );
+			}
 		}
 
 
@@ -51,51 +67,6 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 			}
 
 			return false;
-		}
-
-
-		/**
-		 * Get ajax routed URL
-		 *
-		 * @param string $route
-		 * @param string $method
-		 *
-		 * @return string
-		 */
-		public function get_ajax_route( $route, $method ) {
-
-			$route = str_replace( array( '\\', '/' ), '!', $route );
-			$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? $_SERVER['REMOTE_ADDR'] : '';
-			$nonce = wp_create_nonce( $ip . get_current_user_id() . $route . $method );
-
-			if ( is_admin() ) {
-				$url = add_query_arg( array(
-					'action'        => 'um_router',
-					'um_action'     => 'route',
-					'um_resource'   => $route,
-					'um_method'     => $method,
-					'um_verify'     => $nonce
-				), get_admin_url( null, 'admin-ajax.php' ) );
-			} else if ( get_option( 'permalink_structure' ) ) {
-				$url = get_home_url( null, 'um-api/route/' . $route . '/' . $method . '/' . $nonce );
-			} else {
-				$url = add_query_arg( array(
-					'um_page'       => 'api',
-					'um_action'     => 'route',
-					'um_resource'   => $route,
-					'um_method'     => $method,
-					'um_verify'     => $nonce
-				), get_home_url() );
-			}
-			return $url;
-		}
-
-
-		/**
-		 * Set variables
-		 */
-		function init_variables() {
-			$this->options = get_option( 'um_options' );
 		}
 
 
@@ -196,7 +167,7 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 			}
 
 			$path = '';
-			if( $basename ) {
+			if ( $basename ) {
 				$array = explode( '/', trim( $basename, '/' ) );
 				$path  = $array[0];
 			}
@@ -308,8 +279,8 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 				trailingslashit( 'ultimate-member/' . $path ) . $template_name
 			) );
 
-			if( !$template ) {
-				if( $path ) {
+			if ( ! $template ) {
+				if ( $path ) {
 					$template = trailingslashit( trailingslashit( WP_PLUGIN_DIR ) . $path );
 				} else {
 					$template = trailingslashit( um_path );
@@ -344,6 +315,9 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 		}
 
 
+		/**
+		 * @return mixed|void
+		 */
 		function cpt_list() {
 			/**
 			 * UM hook
@@ -370,5 +344,25 @@ if ( ! class_exists( 'UM_Functions' ) ) {
 			return $cpt;
 		}
 
+
+		/**
+		 * @param array $array
+		 * @param string $key
+		 * @param array $insert_array
+		 *
+		 * @return array
+		 */
+		function array_insert_before( $array, $key, $insert_array ) {
+			$index = array_search( $key, array_keys( $array ) );
+			if ( $index === false ) {
+				return $array;
+			}
+
+			$array = array_slice( $array, 0, $index, true ) +
+			         $insert_array +
+			         array_slice( $array, $index, count( $array ) - 1, true );
+
+			return $array;
+		}
 	}
 }

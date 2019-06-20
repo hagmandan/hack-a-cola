@@ -35,7 +35,7 @@ class Messages {
 	/**
 	 * Display message when API returns other than 200 or 404.
 	 *
-	 * @param string
+	 * @param string $type
 	 *
 	 * @return bool
 	 */
@@ -58,7 +58,8 @@ class Messages {
 				case is_wp_error( $type ):
 					self::$error_message = $type->get_error_message();
 					add_action(
-						is_multisite() ? 'network_admin_notices' : 'admin_notices', [
+						is_multisite() ? 'network_admin_notices' : 'admin_notices',
+						[
 							$this,
 							'show_wp_error',
 						]
@@ -72,13 +73,15 @@ class Messages {
 				case 'git':
 				default:
 					add_action(
-						is_multisite() ? 'network_admin_notices' : 'admin_notices', [
+						is_multisite() ? 'network_admin_notices' : 'admin_notices',
+						[
 							$this,
 							'show_403_error_message',
 						]
 					);
 					add_action(
-						is_multisite() ? 'network_admin_notices' : 'admin_notices', [
+						is_multisite() ? 'network_admin_notices' : 'admin_notices',
+						[
 							$this,
 							'show_401_error_message',
 						]
@@ -108,7 +111,7 @@ class Messages {
 						<?php
 						esc_html_e( 'GitHub Updater Error Code:', 'github-updater' );
 						echo ' ' . $repo['code'];
-				?>
+						?>
 						<br>
 						<?php
 						printf(
@@ -119,7 +122,7 @@ class Messages {
 						echo '<br>';
 						printf(
 							/* translators: %s: GitHub personal access token URL */
-							esc_html__( 'It looks like you are running into GitHub API rate limits. Be sure and configure a <a href="%s">Personal Access Token</a> to avoid this issue.', 'github-updater' ),
+							wp_kses_post( __( 'It looks like you are running into GitHub API rate limits. Be sure and configure a <a href="%s">Personal Access Token</a> to avoid this issue.', 'github-updater' ) ),
 							esc_url( 'https://help.github.com/articles/creating-an-access-token-for-command-line-use/' )
 						);
 						?>
@@ -149,7 +152,7 @@ class Messages {
 						<?php
 						esc_html_e( 'GitHub Updater Error Code:', 'github-updater' );
 						echo ' ' . $repo['code'];
-				?>
+						?>
 						<br>
 						<?php esc_html_e( 'There is probably an access token or password error on the GitHub Updater Settings page.', 'github-updater' ); ?>
 					</p>
@@ -163,16 +166,13 @@ class Messages {
 	 * Generate error message for WP_Error.
 	 */
 	public function show_wp_error() {
-		if ( ! \PAnD::is_admin_notice_active( 'wp-error-1' ) ) {
-			return;
-		}
 		?>
-		<div data-dismissible="wp-error-1" class="notice-error notice is-dismissible">
+		<div class="notice-error notice">
 			<p>
 				<?php
 				esc_html_e( 'GitHub Updater Error Code:', 'github-updater' );
 				echo ' ' . self::$error_message;
-		?>
+				?>
 			</p>
 		</div>
 		<?php

@@ -2,7 +2,7 @@
 /**
  * Template part for displaying page content in page.php
  *
- * @link https://codex.wordpress.org/Template_Hierarchy
+ * @link https://developer.wordpress.org/themes/basics/template-hierarchy/
  *
  * @package WordPress
  * @subpackage Twenty_Seventeen
@@ -10,12 +10,6 @@
  * @version 1.0
  */
 
-	$vals = get_post_custom_values('wiki_link',$page->ID);
-	$wikiLink = $vals[0];
-
-	if (!empty($wikiLink)) {
-		echo do_shortcode('[rdp-wiki-embed url='.$wikiLink.']');
-	}
 ?>
 
 <article id="post-<?php the_ID(); ?>" <?php post_class(); ?>>
@@ -27,10 +21,12 @@
 		<?php
 			the_content();
 
-			wp_link_pages( array(
-				'before' => '<div class="page-links">' . __( 'Pages:', 'twentyseventeen' ),
-				'after'  => '</div>',
-			) );
-		?>
+			wp_link_pages(
+				array(
+					'before' => '<div class="page-links">' . __( 'Pages:', 'twentyseventeen' ),
+					'after'  => '</div>',
+				)
+			);
+			?>
 	</div><!-- .entry-content -->
-</article><!-- #post-## -->
+</article><!-- #post-<?php the_ID(); ?> -->

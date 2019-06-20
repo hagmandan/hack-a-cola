@@ -53,28 +53,30 @@ function um_remove_special_users_from_list( $query_args, $args ) {
 
 	}
 
-	if ( ! UM()->roles()->um_user_can( 'can_edit_everyone' ) || UM()->options()->get( 'account_hide_in_directory' ) ) {
-		$query_args['meta_query'][] = array(
-			"relation"	=> "OR",
-			array(
-				'key' => 'hide_in_members',
-				'value' => '',
-				'compare' => 'NOT EXISTS'
-			),
-			array(
-				"relation"	=> "AND",
+	if ( UM()->options()->get( 'account_hide_in_directory' ) ) {
+		if ( ! UM()->roles()->um_user_can( 'can_access_private_profile' ) ) {
+			$query_args['meta_query'][] = array(
+				"relation"	=> "OR",
 				array(
 					'key' => 'hide_in_members',
-					'value' => __('Yes','ultimate-member'),
-					'compare' => 'NOT LIKE'
+					'value' => '',
+					'compare' => 'NOT EXISTS'
 				),
 				array(
-					'key' => 'hide_in_members',
-					'value' => 'Yes',
-					'compare' => 'NOT LIKE'
+					"relation"	=> "AND",
+					array(
+						'key' => 'hide_in_members',
+						'value' => __('Yes','ultimate-member'),
+						'compare' => 'NOT LIKE'
+					),
+					array(
+						'key' => 'hide_in_members',
+						'value' => 'Yes',
+						'compare' => 'NOT LIKE'
+					),
 				),
-			),
-		);
+			);
+		}
 	}
 
 	$roles = um_user( 'can_view_roles' );
@@ -84,11 +86,14 @@ function um_remove_special_users_from_list( $query_args, $args ) {
 
 		if ( ! empty( $roles ) ) {
 			if ( ! empty( $query_args['role__in'] ) ) {
-				$query_args['role__in'] = array_intersect( $query_args['role__in'], $roles );
+				$roles_intersect = array_intersect( $query_args['role__in'], $roles );
+				if( ! empty( $roles_intersect ) ){
+					$query_args['role__in'] = $roles_intersect;
+				}
 			} else {
 				$query_args['role__in'] = $roles;
 			}
-		}
+		}		
 
 	}
 
@@ -100,17 +105,30 @@ add_filter( 'um_prepare_user_query_args', 'um_remove_special_users_from_list', 9
 /**
  * Adds search parameters
  *
+ * @hooked 'um_prepare_user_query_args'
+ *
  * @param $query_args
  * @param $args
  *
  * @return mixed|void
  */
-function um_add_search_to_query( $query_args, $args ){
+function um_add_search_to_query( $query_args, $args ) {
 	extract( $args );
+
+	if ( ! empty( $args['search_filters'] ) ) {
+		$_REQUEST['um_search'] = 1;
+	}
 
 	if ( isset( $_REQUEST['um_search'] ) ) {
 
 		$query = UM()->permalinks()->get_query_array();
+
+		if ( ! empty( $args['search_filters'] ) ) {
+			parse_str( $args['search_filters'], $search_filters );
+			if ( $search_filters && is_array( $search_filters ) ) {
+				$query = array_merge( $search_filters, $query );
+			}
+		}
 
 		// if searching
 		if ( isset( $query['search'] ) ) {
@@ -154,7 +172,8 @@ function um_add_search_to_query( $query_args, $args ){
 								) );
 
 								if ( in_array( $filter_data['attrs']['type'], $types ) ) {
-									$field_query = array_merge( $field_query, array(
+
+									$arr_meta_query = array(
 										array(
 											'key' => $field,
 											'value' => serialize( strval( trim( $value ) ) ),
@@ -162,11 +181,24 @@ function um_add_search_to_query( $query_args, $args ){
 										),
 										array(
 											'key' => $field,
-											'value' => serialize( intval( trim( $value ) ) ),
+											'value' => '"' . trim( $value ) . '"',
 											'compare' => 'LIKE',
 										)
-									) );
+									);
+
+									if( is_numeric( $value ) ){
+
+										$arr_meta_query[ ] = array(
+											'key' => $field,
+											'value' => serialize( intval( trim( $value ) ) ),
+											'compare' => 'LIKE',
+										);
+
+									}
+
+									$field_query = array_merge( $field_query, $arr_meta_query );
 								}
+
 							} else {
 								$field_query = array(
 									array(
@@ -313,9 +345,9 @@ function um_prepare_user_query_args( $query_args, $args ) {
 	// must have a cover photo
 	if ( $has_cover_photo == 1 ) {
 		$query_args['meta_query'][] = array(
-			'key' => 'cover_photo',
-			'value' => '',
-			'compare' => '!='
+			'key'       => 'cover_photo',
+			'value'     => '',
+			'compare'   => '!='
 		);
 	}
 
@@ -330,16 +362,8 @@ function um_prepare_user_query_args( $query_args, $args ) {
 
 	// add roles to appear in directory
 	if ( ! empty( $roles ) ) {
-
 		//since WP4.4 use 'role__in' argument
 		$query_args['role__in'] = $roles;
-
-		/*$query_args['meta_query'][] = array(
-				'key' => 'role',
-				'value' => $roles,
-				'compare' => 'IN'
-			);*/
-
 	}
 
 	// sort members by
@@ -347,13 +371,50 @@ function um_prepare_user_query_args( $query_args, $args ) {
 
 	if ( isset( $sortby ) ) {
 
-
 		if ( $sortby == 'other' && $sortby_custom ) {
 
 			$query_args['meta_key'] = $sortby_custom;
 			$query_args['orderby'] = 'meta_value, display_name';
 
-		} else if ( in_array( $sortby, array( 'last_name', 'first_name' ) ) ) {
+		} elseif ( 'display_name' == $sortby ) {
+
+			/*$display_name = UM()->options()->get( 'display_name' );
+			if ( $display_name == 'username' ) {
+				$query_args['orderby'] = 'user_login';
+				$order = 'ASC';
+			} else {
+				$query_args['meta_query'][] = array(
+					'relation' => 'OR',
+					'full_name' => array(
+						'key'       => 'full_name',
+						'compare'   => 'EXISTS'
+					),
+					array(
+						'key'       => 'full_name',
+						'compare'   => 'NOT EXISTS'
+					)
+				);
+
+				$query_args['orderby'] = 'full_name, display_name';
+				$order = 'ASC';
+			}*/
+
+			$query_args['meta_query'][] = array(
+				'relation' => 'OR',
+				'full_name' => array(
+					'key'       => 'full_name',
+					'compare'   => 'EXISTS'
+				),
+				array(
+					'key'       => 'full_name',
+					'compare'   => 'NOT EXISTS'
+				)
+			);
+
+			$query_args['orderby'] = 'full_name, display_name';
+			$order = 'ASC';
+
+		} elseif ( in_array( $sortby, array( 'last_name', 'first_name' ) ) ) {
 
 			$query_args['meta_key'] = $sortby;
 			$query_args['orderby'] = 'meta_value';
@@ -361,7 +422,7 @@ function um_prepare_user_query_args( $query_args, $args ) {
 		} else {
 
 			if ( strstr( $sortby, '_desc' ) ) {
-				$sortby = str_replace('_desc','',$sortby);
+				$sortby = str_replace( '_desc', '', $sortby );
 				$order = 'DESC';
 			}
 
@@ -369,7 +430,7 @@ function um_prepare_user_query_args( $query_args, $args ) {
 				$sortby = str_replace('_asc','',$sortby);
 				$order = 'ASC';
 			}
-				
+
 			$query_args['orderby'] = $sortby;
 
 		}
@@ -400,7 +461,7 @@ function um_prepare_user_query_args( $query_args, $args ) {
 		 * }
 		 * ?>
 		 */
-		$query_args = apply_filters('um_modify_sortby_parameter', $query_args, $sortby);
+		$query_args = apply_filters( 'um_modify_sortby_parameter', $query_args, $sortby );
 
 	}
 
@@ -419,9 +480,18 @@ add_filter( 'um_prepare_user_query_args', 'um_prepare_user_query_args', 10, 2 );
  */
 function um_sortby_last_login( $query_args, $sortby ) {
 	if ( $sortby == 'last_login' ) {
-		$query_args['orderby'] = 'meta_value_num';
-		$query_args['order'] = 'desc';
-		$query_args['meta_key'] = '_um_last_login';
+		$query_args['orderby'] = array( 'um_last_login' => 'DESC' );
+		$query_args['meta_query'][] = array(
+			'relation' => 'OR',
+			array(
+				'key'   => '_um_last_login',
+				'compare'   => 'EXISTS',
+			),
+			'um_last_login' => array(
+				'key'   => '_um_last_login',
+				'compare'   => 'NOT EXISTS',
+			),
+		);
 	}
 	return $query_args;
 }
@@ -436,30 +506,33 @@ add_filter( 'um_modify_sortby_parameter', 'um_sortby_last_login', 100, 2 );
  * @return mixed
  */
 function um_modify_sortby_randomly( $query ) {
-	if( um_is_session_started() === false ){
-		@session_start();
-	}
 
-	// Reset seed on load of initial
-	if( ! isset( $_REQUEST['members_page'] ) || $_REQUEST['members_page'] == 0 ||  $_REQUEST['members_page'] == 1 ) {
-		if( isset( $_SESSION['seed'] ) ) {
-			unset( $_SESSION['seed'] );
+	if( 'random' == $query->query_vars["orderby"] ) {
+
+		if( um_is_session_started() === false ){
+			@session_start();
 		}
-	}
 
-	// Get seed from session variable if it exists
-	$seed = false;
-	if( isset( $_SESSION['seed'] ) ) {
-		$seed = $_SESSION['seed'];
-	}
-        
-	// Set new seed if none exists
-	if ( ! $seed ) {
-		$seed = rand();
-		$_SESSION['seed'] = $seed;
-	}
+		// Reset seed on load of initial
+		if( ! isset( $_REQUEST['members_page'] ) || $_REQUEST['members_page'] == 0 ||  $_REQUEST['members_page'] == 1 ) {
+			if( isset( $_SESSION['seed'] ) ) {
+				unset( $_SESSION['seed'] );
+			}
+		}
 
-	if($query->query_vars["orderby"] == 'random') {
+		// Get seed from session variable if it exists
+		$seed = false;
+		if( isset( $_SESSION['seed'] ) ) {
+			$seed = $_SESSION['seed'];
+		}
+
+		// Set new seed if none exists
+		if ( ! $seed ) {
+			$seed = rand();
+			$_SESSION['seed'] = $seed;
+		}
+
+
 		$query->query_orderby = 'ORDER by RAND('. $seed.')';
 	}
 
@@ -481,7 +554,7 @@ function um_prepare_user_results_array( $result ) {
 	} else {
 		$result['no_users'] = 0;
 	}
-   
+
 	return $result;
 }
 add_filter( 'um_prepare_user_results_array', 'um_prepare_user_results_array', 50, 2 );

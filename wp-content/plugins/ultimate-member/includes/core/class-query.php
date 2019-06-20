@@ -39,6 +39,8 @@ if ( ! class_exists( 'um\core\Query' ) ) {
 		 * Ajax pagination for posts
 		 */
 		function ajax_paginate() {
+			UM()->check_ajax_nonce();
+
 			/**
 			 * @var $hook
 			 * @var $args
@@ -68,8 +70,7 @@ if ( ! class_exists( 'um\core\Query' ) ) {
 			 */
 			do_action( "um_ajax_load_posts__{$hook}", $args );
 
-			$output = ob_get_contents();
-			ob_end_clean();
+			$output = ob_get_clean();
 
 			die( $output );
 		}
@@ -93,8 +94,13 @@ if ( ! class_exists( 'um\core\Query' ) ) {
 				return 'reached_maximum_limit';
 			}
 
-
-			$pages = $wpdb->get_results('SELECT * FROM '.$wpdb->posts.' WHERE post_type = "page" AND post_status = "publish" ', OBJECT);
+			$pages = $wpdb->get_results(
+				"SELECT * 
+				FROM {$wpdb->posts} 
+				WHERE post_type = 'page' AND 
+				      post_status = 'publish'",
+				OBJECT
+			);
 
 			$array = array();
 			if( $wpdb->num_rows > 0 ){

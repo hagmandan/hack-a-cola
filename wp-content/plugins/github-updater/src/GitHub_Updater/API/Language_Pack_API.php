@@ -20,19 +20,13 @@ class Language_Pack_API extends API {
 	use GHU_Trait;
 
 	/**
-	 * Holds loose class method name.
-	 *
-	 * @var null
-	 */
-	public static $method = 'translation';
-
-	/**
 	 * Constructor.
 	 *
 	 * @param \stdClass $type
 	 */
 	public function __construct( $type ) {
 		parent::__construct();
+		self::$method   = 'translation';
 		$this->type     = $type;
 		$this->response = $this->get_repo_cache();
 	}
@@ -46,17 +40,16 @@ class Language_Pack_API extends API {
 	 */
 	public function get_language_pack( $headers ) {
 		$response = ! empty( $this->response['languages'] ) ? $this->response['languages'] : false;
-		$type     = explode( '_', $this->type->type );
 
 		if ( ! $response ) {
-			$response = $this->get_language_pack_json( $type[0], $headers, $response );
+			$response = $this->get_language_pack_json( $this->type->git, $headers, $response );
 
 			if ( $response ) {
 				foreach ( $response as $locale ) {
-					$package = $this->process_language_pack_package( $type[0], $locale, $headers );
+					$package = $this->process_language_pack_package( $this->type->git, $locale, $headers );
 
 					$response->{$locale->language}->package = $package;
-					$response->{$locale->language}->type    = $type[1];
+					$response->{$locale->language}->type    = $this->type->type;
 					$response->{$locale->language}->version = $this->type->local_version;
 				}
 
@@ -74,33 +67,35 @@ class Language_Pack_API extends API {
 	/**
 	 * Get language-pack.json from appropriate host.
 	 *
-	 * @param string $type     ( github|bitbucket|gitlab ).
+	 * @param string $git     ( github|bitbucket|gitlab|gitea ).
 	 * @param array  $headers
 	 * @param mixed  $response API response.
 	 *
 	 * @return array|bool|mixed
 	 */
-	private function get_language_pack_json( $type, $headers, $response ) {
-		switch ( $type ) {
+	private function get_language_pack_json( $git, $headers, $response ) {
+		switch ( $git ) {
 			case 'github':
 				$response = $this->api( '/repos/' . $headers['owner'] . '/' . $headers['repo'] . '/contents/language-pack.json' );
-				$contents = base64_decode( $response->content );
-				$response = json_decode( $contents );
+				$response = isset( $response->content )
+					? json_decode( base64_decode( $response->content ) )
+					: null;
 				break;
 			case 'bitbucket':
-				$response = $this->api( '/1.0/repositories/' . $headers['owner'] . '/' . $headers['repo'] . '/src/master/language-pack.json' );
-				$response = json_decode( $response->data );
+				$response = $this->api( '/2.0/repositories/' . $headers['owner'] . '/' . $headers['repo'] . '/src/master/language-pack.json' );
 				break;
 			case 'gitlab':
-				$id       = urlencode( $headers['owner'] . '/' . $headers['repo'] );
+				$id       = rawurlencode( $headers['owner'] . '/' . $headers['repo'] );
 				$response = $this->api( '/projects/' . $id . '/repository/files/language-pack.json' );
-				$contents = base64_decode( $response->content );
-				$response = json_decode( $contents );
+				$response = isset( $response->content )
+					? json_decode( base64_decode( $response->content ) )
+					: null;
 				break;
 			case 'gitea':
 				$response = $this->api( '/repos/' . $headers['owner'] . '/' . $headers['repo'] . '/raw/master/language-pack.json' );
-				$contents = base64_decode( $response->content );
-				$response = json_decode( $contents );
+				$response = isset( $response->content )
+					? json_decode( base64_decode( $response->content ) )
+					: null;
 				break;
 		}
 
@@ -114,15 +109,15 @@ class Language_Pack_API extends API {
 	/**
 	 * Process $package for update transient.
 	 *
-	 * @param string $type    ( github|bitbucket|gitlab ).
+	 * @param string $git    ( github|bitbucket|gitlab|gitea ).
 	 * @param string $locale
 	 * @param array  $headers
 	 *
 	 * @return array|null|string
 	 */
-	private function process_language_pack_package( $type, $locale, $headers ) {
+	private function process_language_pack_package( $git, $locale, $headers ) {
 		$package = null;
-		switch ( $type ) {
+		switch ( $git ) {
 			case 'github':
 				$package = [ 'https://github.com', $headers['owner'], $headers['repo'], 'blob/master' ];
 				$package = implode( '/', $package ) . $locale->package;
@@ -135,6 +130,11 @@ class Language_Pack_API extends API {
 			case 'gitlab':
 				$package = [ 'https://gitlab.com', $headers['owner'], $headers['repo'], 'raw/master' ];
 				$package = implode( '/', $package ) . $locale->package;
+				break;
+			case 'gitea':
+				// TODO: make sure this works as expected.
+				$package = [ $headers['uri'], 'raw/master' ];
+				$package = implode( '/', $package ) . $local->package;
 				break;
 		}
 

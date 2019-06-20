@@ -20,6 +20,12 @@ NestedPages.Formatter = function()
 			var button = allButtons[i];
 			var row = $(button).parent('.row').parent('li');
 			if ( $(row).children('ol').length > 0 ){ // Row has a child menu
+
+				// Hide the toggle and child list if all items are in the trash
+				if ( $(row).children('ol').find('li.page-row').length < 1 ){
+					$(row).children('ol').hide();
+					continue;
+				}
 				
 				var open = ( $(row).children('ol:visible').length > 0 ) ? true : false;
 				var html = '<div class="child-toggle-spacer"></div>';
@@ -1264,12 +1270,15 @@ NestedPages.NewPost = function()
 			items : 'li',
 			handle: '.handle',
 		});
+		plugin.toggleAddEditButton(form);
 	}
 
 	// Remove a page title field
 	plugin.removeTitleField = function(button)
 	{
+		var form = $(button).parents('form');
 		$(button).parents('.new-child-row').parent('li').remove();
+		plugin.toggleAddEditButton(form);
 	}
 
 	// Submit the New Page Form
@@ -1444,6 +1453,22 @@ NestedPages.NewPost = function()
 	{
 		var row = $(NestedPages.selectors.rows + '#menuItem_' + id);
 		return row;
+	}
+
+	// Toggle the "Add & Edit" & "Add" buttons depending on row count
+	plugin.toggleAddEditButton = function(form)
+	{
+		var titleCount = $(form).find('.np_title').length;
+		if ( titleCount < 1 ){
+			$(NestedPages.selectors.newPageSubmitButton).hide();
+			return;
+		}
+		$(NestedPages.selectors.newPageSubmitButton).show();
+		if ( titleCount > 1 ){
+			$(NestedPages.selectors.newPageSubmitButton + '.add-edit').hide()
+			return;
+		}
+		$(NestedPages.selectors.newPageSubmitButton + '.add-edit').show()
 	}
 
 	// Toggle the form loading state
@@ -2502,7 +2527,8 @@ NestedPages.formActions = {
 	manualMenuSync : 'npmanualMenuSync',
 	postSearch: 'nppostSearch',
 	wpmlTranslations : 'npWpmlTranslations',
-	resetSettings : 'npresetSettings'
+	resetSettings : 'npresetSettings',
+	resetUserPrefs : 'npresetUserPreferences'
 }
 
 

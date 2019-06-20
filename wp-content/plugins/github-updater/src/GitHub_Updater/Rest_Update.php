@@ -2,8 +2,7 @@
 /**
  * GitHub Updater
  *
- * @author    Andy Fragen
- * @author    Mikael Lindqvist
+ * @author    Andy Fragen, Mikael Lindqvist
  * @license   GPL-2.0+
  * @link      https://github.com/afragen/github-updater
  * @package   github-updater
@@ -33,7 +32,7 @@ class Rest_Update extends Base {
 	/**
 	 * Holds REST Upgrader Skin.
 	 *
-	 * @var \Fragen\GitHub_Updater\Rest_Upgrader_Skin
+	 * @var Rest_Upgrader_Skin $upgrader_skin
 	 */
 	protected $upgrader_skin;
 
@@ -52,14 +51,14 @@ class Rest_Update extends Base {
 	 * @param string $plugin_slug
 	 * @param string $tag
 	 *
-	 * @throws \Exception
+	 * @throws \UnexpectedValueException Plugin not found or not updatable.
 	 */
 	public function update_plugin( $plugin_slug, $tag = 'master' ) {
 		$plugin           = null;
 		$is_plugin_active = false;
 
 		foreach ( (array) Singleton::get_instance( 'Plugin', $this )->get_plugin_configs() as $config_entry ) {
-			if ( $config_entry->repo === $plugin_slug ) {
+			if ( $config_entry->slug === $plugin_slug ) {
 				$plugin = $config_entry;
 				break;
 			}
@@ -69,34 +68,35 @@ class Rest_Update extends Base {
 			throw new \UnexpectedValueException( 'Plugin not found or not updatable with GitHub Updater: ' . $plugin_slug );
 		}
 
-		if ( is_plugin_active( $plugin->slug ) ) {
+		if ( is_plugin_active( $plugin->file ) ) {
 			$is_plugin_active = true;
 		}
 
 		$this->get_remote_repo_meta( $plugin );
-		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $plugin->type, $plugin );
+		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $plugin->git, $plugin );
 
 		$update = [
-			'slug'        => $plugin->repo,
-			'plugin'      => $plugin->slug,
+			'slug'        => $plugin->slug,
+			'plugin'      => $plugin->file,
 			'new_version' => null,
 			'url'         => $plugin->uri,
-			'package'     => $repo_api->construct_download_link( false, $tag ),
+			'package'     => $repo_api->construct_download_link( $tag ),
 		];
 
 		add_filter(
-			'site_transient_update_plugins', function ( $current ) use ( $plugin, $update ) {
-				$current->response[ $plugin->slug ] = (object) $update;
+			'site_transient_update_plugins',
+			function ( $current ) use ( $plugin, $update ) {
+				$current->response[ $plugin->file ] = (object) $update;
 
 				return $current;
 			}
 		);
 
 		$upgrader = new \Plugin_Upgrader( $this->upgrader_skin );
-		$upgrader->upgrade( $plugin->slug );
+		$upgrader->upgrade( $plugin->file );
 
 		if ( $is_plugin_active ) {
-			$activate = is_multisite() ? activate_plugin( $plugin->slug, null, true ) : activate_plugin( $plugin->slug );
+			$activate = is_multisite() ? activate_plugin( $plugin->file, null, true ) : activate_plugin( $plugin->file );
 			if ( ! $activate ) {
 				$this->upgrader_skin->messages[] = 'Plugin reactivated successfully.';
 			}
@@ -109,13 +109,13 @@ class Rest_Update extends Base {
 	 * @param string $theme_slug
 	 * @param string $tag
 	 *
-	 * @throws \Exception
+	 * @throws \UnexpectedValueException Theme not found or not updatable.
 	 */
 	public function update_theme( $theme_slug, $tag = 'master' ) {
 		$theme = null;
 
 		foreach ( (array) Singleton::get_instance( 'Theme', $this )->get_theme_configs() as $config_entry ) {
-			if ( $config_entry->repo === $theme_slug ) {
+			if ( $config_entry->slug === $theme_slug ) {
 				$theme = $config_entry;
 				break;
 			}
@@ -126,25 +126,26 @@ class Rest_Update extends Base {
 		}
 
 		$this->get_remote_repo_meta( $theme );
-		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $theme->type, $theme );
+		$repo_api = Singleton::get_instance( 'API', $this )->get_repo_api( $theme->git, $theme );
 
 		$update = [
-			'theme'       => $theme->repo,
+			'theme'       => $theme->slug,
 			'new_version' => null,
 			'url'         => $theme->uri,
-			'package'     => $repo_api->construct_download_link( false, $tag ),
+			'package'     => $repo_api->construct_download_link( $tag ),
 		];
 
 		add_filter(
-			'site_transient_update_themes', function ( $current ) use ( $theme, $update ) {
-				$current->response[ $theme->repo ] = $update;
+			'site_transient_update_themes',
+			function ( $current ) use ( $theme, $update ) {
+				$current->response[ $theme->slug ] = $update;
 
 				return $current;
 			}
 		);
 
 		$upgrader = new \Theme_Upgrader( $this->upgrader_skin );
-		$upgrader->upgrade( $theme->repo );
+		$upgrader->upgrade( $theme->slug );
 	}
 
 	/**
@@ -168,6 +169,8 @@ class Rest_Update extends Base {
 	 * If the request came through a webhook, and if the branch in the
 	 * webhook matches the branch specified by the url, use the latest
 	 * update available as specified in the webhook payload.
+	 *
+	 * @throws \UnexpectedValueException Under multiple bad or missing params.
 	 */
 	public function process_request() {
 		$start = microtime( true );
@@ -193,10 +196,11 @@ class Rest_Update extends Base {
 				$tag = $_REQUEST['committish'];
 			}
 
-			$current_branch = $this->get_local_branch();
 			$this->get_webhook_source();
-			if ( $tag !== $current_branch ) {
-				throw new \UnexpectedValueException( 'Request tag and webhook are not matching.' );
+			$current_branch = $this->get_local_branch();
+			$override       = isset( $_REQUEST['override'] );
+			if ( $tag !== $current_branch && ! $override ) {
+				throw new \UnexpectedValueException( 'Webhook tag and current branch are not matching. Consider using `override` query arg.' );
 			}
 
 			if ( isset( $_REQUEST['plugin'] ) ) {
@@ -289,6 +293,17 @@ class Rest_Update extends Base {
 		$json_encode_flags = 128 | 64;
 
 		error_log( json_encode( $response, $json_encode_flags ) );
+
+		/**
+		 * Action hook after processing REST process.
+		 *
+		 * @since 8.6.0
+		 *
+		 * @param array $response
+		 * @param int   $code     HTTP response.
+		 */
+		do_action( 'github_updater_post_rest_process_request', $response, $code );
+
 		unset( $response['success'] );
 		if ( 200 === $code ) {
 			wp_die( wp_send_json_success( $response, $code ) );

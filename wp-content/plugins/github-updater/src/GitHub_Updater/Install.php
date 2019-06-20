@@ -61,13 +61,20 @@ class Install {
 
 	/**
 	 * Constructor.
-	 * Need class-wp-upgrader.php for upgrade classes.
 	 */
 	public function __construct() {
 		self::$options        = $this->get_class_vars( 'Base', 'options' );
 		self::$installed_apis = $this->get_class_vars( 'Base', 'installed_apis' );
 		self::$git_servers    = $this->get_class_vars( 'Base', 'git_servers' );
+	}
 
+	/**
+	 * Let's set up the Install tabs.
+	 * Need class-wp-upgrader.php for upgrade classes.
+	 *
+	 * @return void
+	 */
+	public function run() {
 		$this->load_js();
 		$this->add_settings_tabs();
 		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
@@ -80,8 +87,9 @@ class Install {
 	 */
 	public function load_js() {
 		add_action(
-			'admin_enqueue_scripts', function () {
-				wp_register_script( 'ghu-install', plugins_url( basename( dirname( dirname( __DIR__ ) ) ) . '/js/ghu-install.js' ), [ 'jquery' ], false, true );
+			'admin_enqueue_scripts',
+			function () {
+				wp_register_script( 'ghu-install', plugins_url( basename( GITHUB_UPDATER_DIR ) . '/js/ghu-install-vanilla.js' ), [], false, true );
 				wp_enqueue_script( 'ghu-install' );
 			}
 		);
@@ -91,18 +99,22 @@ class Install {
 	 * Adds Install tabs to Settings page.
 	 */
 	public function add_settings_tabs() {
+		$install_tabs = [];
+		if ( current_user_can( 'install_plugins' ) ) {
+			$install_tabs['github_updater_install_plugin'] = esc_html__( 'Install Plugin', 'github-updater' );
+		}
+		if ( current_user_can( 'install_themes' ) ) {
+			$install_tabs['github_updater_install_theme'] = esc_html__( 'Install Theme', 'github-updater' );
+		}
 		add_filter(
-			'github_updater_add_settings_tabs', function ( $tabs ) {
-				$install_tabs = [
-					'github_updater_install_plugin' => esc_html__( 'Install Plugin', 'github-updater' ),
-					'github_updater_install_theme'  => esc_html__( 'Install Theme', 'github-updater' ),
-				];
-
+			'github_updater_add_settings_tabs',
+			function ( $tabs ) use ( $install_tabs ) {
 				return array_merge( $tabs, $install_tabs );
 			}
 		);
 		add_action(
-			'github_updater_add_admin_page', function ( $tab ) {
+			'github_updater_add_admin_page',
+			function ( $tab ) {
 				$this->add_admin_page( $tab );
 			}
 		);
@@ -204,6 +216,13 @@ class Install {
 				}
 			}
 
+			/*
+			 * Install from Zipfile.
+			 */
+			if ( 'zipfile' === self::$install['github_updater_api'] ) {
+				self::$install = Singleton::get_instance( 'API\Zipfile_API', $this )->remote_install( $headers, self::$install );
+			}
+
 			if ( isset( self::$install['options'] ) ) {
 				$this->save_options_on_install( self::$install['options'] );
 			}
@@ -268,6 +287,9 @@ class Install {
 			case 'gitea':
 				$_POST['gitea_access_token'] = $config['private'] ?: null;
 				break;
+			case 'zipfile':
+				$_POST['zipfile_slug'] = $config['slug'];
+				break;
 		}
 	}
 
@@ -292,10 +314,13 @@ class Install {
 				: new \Plugin_Installer_Skin( compact( 'type', 'url', 'nonce', 'plugin' ) );
 			$upgrader = new \Plugin_Upgrader( $skin );
 			add_filter(
-				'install_plugin_complete_actions', [
+				'install_plugin_complete_actions',
+				[
 					$this,
 					'install_plugin_complete_actions',
-				], 10, 3
+				],
+				10,
+				3
 			);
 		}
 
@@ -308,10 +333,13 @@ class Install {
 				: new \Theme_Installer_Skin( compact( 'type', 'url', 'nonce', 'theme' ) );
 			$upgrader = new \Theme_Upgrader( $skin );
 			add_filter(
-				'install_theme_complete_actions', [
+				'install_theme_complete_actions',
+				[
 					$this,
 					'install_theme_complete_actions',
-				], 10, 3
+				],
+				10,
+				3
 			);
 		}
 
@@ -340,7 +368,7 @@ class Install {
 			if ( 'theme' === $type ) {
 				submit_button( esc_html__( 'Install Theme', 'github-updater' ) );
 			}
-		?>
+			?>
 		</form>
 		<?php
 	}
@@ -427,7 +455,7 @@ class Install {
 	public function get_repo() {
 		?>
 		<label for="github_updater_repo">
-			<input type="text" style="width:50%;" name="github_updater_repo" value="" autofocus>
+			<input type="text" style="width:50%;" id="github_updater_repo" name="github_updater_repo" value="" autofocus>
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'URI is case sensitive.', 'github-updater' ); ?>
@@ -442,7 +470,7 @@ class Install {
 	public function branch() {
 		?>
 		<label for="github_updater_branch">
-			<input type="text" style="width:50%;" name="github_updater_branch" value="" placeholder="master">
+			<input type="text" style="width:50%;" id="github_updater_branch" name="github_updater_branch" value="" placeholder="master">
 			<br>
 			<span class="description">
 				<?php esc_html_e( 'Enter branch name or leave empty for `master`', 'github-updater' ); ?>
@@ -457,7 +485,7 @@ class Install {
 	public function install_api() {
 		?>
 		<label for="github_updater_api">
-			<select name="github_updater_api">
+			<select id="github_updater_api" name="github_updater_api">
 				<?php foreach ( self::$git_servers as $key => $value ) : ?>
 					<?php if ( self::$installed_apis[ $key . '_api' ] ) : ?>
 						<option value="<?php esc_attr_e( $key ); ?>" <?php selected( $key ); ?> >
@@ -473,9 +501,9 @@ class Install {
 	/**
 	 * Remove activation links after plugin installation as no method to get $plugin_file.
 	 *
-	 * @param $install_actions
-	 * @param $api
-	 * @param $plugin_file
+	 * @param array  $install_actions
+	 * @param mixed  $api
+	 * @param string $plugin_file
 	 *
 	 * @return mixed
 	 */
@@ -488,9 +516,9 @@ class Install {
 	/**
 	 * Fix activation links after theme installation, no method to get proper theme name.
 	 *
-	 * @param $install_actions
-	 * @param $api
-	 * @param $theme_info
+	 * @param array $install_actions
+	 * @param mixed $api
+	 * @param mixed $theme_info
 	 *
 	 * @return mixed
 	 */
@@ -503,9 +531,10 @@ class Install {
 		$activate_link = add_query_arg(
 			[
 				'action'     => 'activate',
-				// 'template'   => urlencode( $template ),
-				'stylesheet' => urlencode( $stylesheet ),
-			], admin_url( 'themes.php' )
+				// 'template'   => rawurlencode( $template ),
+				'stylesheet' => rawurlencode( $stylesheet ),
+			],
+			admin_url( 'themes.php' )
 		);
 		$activate_link = esc_url( wp_nonce_url( $activate_link, 'switch-theme_' . $stylesheet ) );
 
@@ -515,8 +544,9 @@ class Install {
 			$network_activate_link = add_query_arg(
 				[
 					'action' => 'enable',
-					'theme'  => urlencode( $stylesheet ),
-				], network_admin_url( 'themes.php' )
+					'theme'  => rawurlencode( $stylesheet ),
+				],
+				network_admin_url( 'themes.php' )
 			);
 			$network_activate_link = esc_url( wp_nonce_url( $network_activate_link, 'enable-theme_' . $stylesheet ) );
 

@@ -327,57 +327,63 @@ function um_submit_form_errors_hook_( $args ) {
 							}
 						} elseif ( $op == 'not empty' ) {
 							if ( ! empty( $cond_value ) ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'equals to' ) {
 							if ( $cond_value == $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'not equals' ) {
 							if ( $cond_value != $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'greater than' ) {
 							if ( $cond_value > $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'less than' ) {
 							if ( $cond_value < $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'contains' ) {
-							if ( strstr( $cond_value, $parent_value ) ) {
-								continue 2;
+							if ( is_string( $cond_value ) && strstr( $cond_value, $parent_value ) ) {
+								continue;
+							}
+							if( is_array( $cond_value ) && in_array( $parent_value, $cond_value ) ) {
+								continue;
 							}
 						}
 					} elseif ( $visibility == 'show' ) {
 						if ( $op == 'empty' ) {
 							if ( ! empty( $cond_value ) ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'not empty' ) {
 							if ( empty( $cond_value ) ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'equals to' ) {
 							if ( $cond_value != $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'not equals' ) {
 							if ( $cond_value == $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'greater than' ) {
 							if ( $cond_value <= $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'less than' ) {
 							if ( $cond_value >= $parent_value ) {
-								continue 2;
+								continue;
 							}
 						} elseif ( $op == 'contains' ) {
-							if ( ! strstr( $cond_value, $parent_value ) ) {
-								continue 2;
+							if ( is_string( $cond_value ) && ! strstr( $cond_value, $parent_value ) ) {
+								continue;
+							}
+							if( is_array( $cond_value ) && !in_array( $parent_value, $cond_value ) ) {
+								continue;
 							}
 						}
 					}
@@ -425,7 +431,7 @@ function um_submit_form_errors_hook_( $args ) {
 			 */
 			do_action( 'um_add_error_on_form_submit_validation', $array, $key, $args );
 
-			if ( isset( $args[$key] ) ) {
+			if ( isset( $args[ $key ] ) ) {
 
 				if ( isset( $array['required'] ) && $array['required'] == 1 ) {
 					if ( ! isset( $args[$key] ) || $args[$key] == '' || $args[$key] == 'empty_file') {
@@ -438,7 +444,7 @@ function um_submit_form_errors_hook_( $args ) {
 				}
 
 				if ( isset( $array['max_words'] ) && $array['max_words'] > 0 ) {
-					if ( str_word_count( $args[$key] ) > $array['max_words'] ) {
+					if ( str_word_count( $args[$key], 0, "éèàôù" ) > $array['max_words'] ) {
 						UM()->form()->add_error($key, sprintf(__('You are only allowed to enter a maximum of %s words','ultimate-member'), $array['max_words']) );
 					}
 				}
@@ -608,14 +614,14 @@ function um_submit_form_errors_hook_( $args ) {
 
 						case 'unique_username':
 
-							if ( $args[$key] == '' ) {
-								UM()->form()->add_error($key, __('You must provide a username','ultimate-member') );
-							} else if ( $mode == 'register' && username_exists( sanitize_user( $args[$key] ) ) ) {
-								UM()->form()->add_error($key, __('Your username is already taken','ultimate-member') );
-							} else if ( is_email( $args[$key] ) ) {
-								UM()->form()->add_error($key, __('Username cannot be an email','ultimate-member') );
-							} else if ( ! UM()->validation()->safe_username( $args[$key] ) ) {
-								UM()->form()->add_error($key, __('Your username contains invalid characters','ultimate-member') );
+							if ( $args[ $key ] == '' ) {
+								UM()->form()->add_error( $key, __( 'You must provide a username', 'ultimate-member' ) );
+							} elseif ( $mode == 'register' && username_exists( sanitize_user( $args[ $key ] ) ) ) {
+								UM()->form()->add_error( $key, __( 'Your username is already taken', 'ultimate-member' ) );
+							} elseif ( is_email( $args[ $key ] ) ) {
+								UM()->form()->add_error( $key, __( 'Username cannot be an email', 'ultimate-member' ) );
+							} elseif ( ! UM()->validation()->safe_username( $args[$key] ) ) {
+								UM()->form()->add_error( $key, __( 'Your username contains invalid characters', 'ultimate-member' ) );
 							}
 
 							break;

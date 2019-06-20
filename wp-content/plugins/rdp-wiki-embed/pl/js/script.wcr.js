@@ -25,6 +25,7 @@ function rdp_wcr_handle_links(){
         if(typeof sHREF == 'undefined')return true;        
         if(sHREF.substring(0, 1) == '#')return true;
         if(url('?rdp_we_resource',sHREF))return true;
+        if(url('?ebb-key',sHREF))return true;
         if($j(this).hasClass('ppe-add-to-cart'))return true;
         if($j(this).hasClass('ppe-cover-link'))return true;  
         if($j(this).parent().closest("li").hasClass('ppe-cover-link'))return true;

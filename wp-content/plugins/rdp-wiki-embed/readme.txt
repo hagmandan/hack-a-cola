@@ -2,8 +2,8 @@
 Contributors: rpayne7264
 Tags: mediawiki, wiki, wiki embed
 Requires at least: 3.0
-Tested up to: 4.8.3
-Stable tag: 1.2.11
+Tested up to: 5.2
+Stable tag: 1.2.15
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,7 @@ Works automatically with [RDP PediaPress Embed] (https://wordpress.org/plugins/r
 
 = Support =
 
-Posting to the WordPress.org Support Forum does not send me notifications of new issues. Therefore, please send support requests using the [contact form on my web site.](http://www.robert-d-payne.com/contact/)
+Posting to the WordPress.org Support Forum does not send me notifications of new issues. Therefore, please send support requests using the [contact form on my web site.](http://www.rdptechsolutions.com/contact/)
 
 
 = Sponsor =
@@ -101,6 +101,18 @@ Global content replace requires Overwrite mode to be enabled. When content is be
 
 
 == Change Log ==
+
+= 1.2.15 =
+* Modified **RDP_WIKI_EMBED_CONTENT->preRender()** to use white list URLs to determine if a link should be treated as an external link.
+
+= 1.2.14 =
+* Minor changes
+
+= 1.2.13 =
+* Updated content parsing to remove jump links
+
+= 1.2.12 =
+* Updated content parsing to preserve line breaks in HTML
 
 = 1.2.11 =
 * Updated link overwrite script to skip menu items with the class **no-wiki-overwrite**

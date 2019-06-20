@@ -11,6 +11,7 @@
 namespace Fragen\GitHub_Updater;
 
 use Fragen\GitHub_Updater\Traits\GHU_Trait;
+use Fragen\Singleton;
 
 /**
  * Class Remote_Management
@@ -21,13 +22,14 @@ class Remote_Management {
 	/**
 	 * Holds the values for remote management settings.
 	 *
-	 * @var mixed
+	 * @var array $option_remote
 	 */
 	public static $options_remote;
+
 	/**
 	 * Supported remote management services.
 	 *
-	 * @var array
+	 * @var array $remote_management
 	 */
 	public static $remote_management = [
 		'ithemes_sync' => 'iThemes Sync',
@@ -35,10 +37,11 @@ class Remote_Management {
 		'managewp'     => 'ManageWP',
 		'mainwp'       => 'MainWP',
 	];
+
 	/**
 	 * Holds the value for the Remote Management API key.
 	 *
-	 * @var
+	 * @var string $api_key
 	 */
 	private static $api_key;
 
@@ -48,7 +51,6 @@ class Remote_Management {
 	public function __construct() {
 		$this->load_options();
 		$this->ensure_api_key_is_set();
-		$this->load_hooks();
 	}
 
 	/**
@@ -64,17 +66,18 @@ class Remote_Management {
 	 */
 	public function ensure_api_key_is_set() {
 		if ( ! self::$api_key ) {
-			update_site_option( 'github_updater_api_key', md5( uniqid( mt_rand(), true ) ) );
+			update_site_option( 'github_updater_api_key', md5( uniqid( \rand(), true ) ) );
 		}
 	}
 
 	/**
 	 * Load needed action/filter hooks.
 	 */
-	private function load_hooks() {
+	public function load_hooks() {
 		add_action( 'admin_init', [ $this, 'remote_management_page_init' ] );
 		add_action(
-			'github_updater_update_settings', function ( $post_data ) {
+			'github_updater_update_settings',
+			function ( $post_data ) {
 				$this->save_settings( $post_data );
 			}
 		);
@@ -89,7 +92,7 @@ class Remote_Management {
 	 *
 	 * @return array $admin_pages
 	 */
-	public function extra_admin_pages( $admin_pages ) {
+	public function extra_admin_pages( $admin_pages = [] ) {
 		$extra_admin_pages = [];
 		foreach ( array_keys( self::$remote_management ) as $key ) {
 			if ( ! empty( self::$options_remote[ $key ] ) ) {
@@ -107,7 +110,7 @@ class Remote_Management {
 	 * @uses 'github_updater_update_settings' action hook
 	 * @uses 'github_updater_save_redirect' filter hook
 	 *
-	 * @param $post_data
+	 * @param array $post_data $_POST data.
 	 */
 	public function save_settings( $post_data ) {
 		if ( isset( $post_data['option_page'] ) &&
@@ -120,7 +123,8 @@ class Remote_Management {
 			update_site_option( 'github_updater_remote_management', (array) $this->sanitize( $options ) );
 
 			add_filter(
-				'github_updater_save_redirect', function ( $option_page ) {
+				'github_updater_save_redirect',
+				function ( $option_page ) {
 					return array_merge( $option_page, [ 'github_updater_remote_management' ] );
 				}
 			);
@@ -131,17 +135,20 @@ class Remote_Management {
 	 * Adds Remote Management tab to Settings page.
 	 */
 	public function add_settings_tabs() {
+		$install_tabs = [ 'github_updater_remote_management' => esc_html__( 'Remote Management', 'github-updater' ) ];
 		add_filter(
-			'github_updater_add_settings_tabs', function ( $tabs ) {
-				$install_tabs = [ 'github_updater_remote_management' => esc_html__( 'Remote Management', 'github-updater' ) ];
-
+			'github_updater_add_settings_tabs',
+			function ( $tabs ) use ( $install_tabs ) {
 				return array_merge( $tabs, $install_tabs );
 			}
 		);
 		add_filter(
-			'github_updater_add_admin_page', function ( $tab, $action ) {
+			'github_updater_add_admin_page',
+			function ( $tab, $action ) {
 				$this->add_admin_page( $tab, $action );
-			}, 10, 2
+			},
+			10,
+			2
 		);
 	}
 
@@ -150,8 +157,8 @@ class Remote_Management {
 	 *
 	 * @uses 'github_updater_add_admin_page' action hook
 	 *
-	 * @param $tab
-	 * @param $action
+	 * @param string $tab Tab name.
+	 * @param string $action Form action.
 	 */
 	public function add_admin_page( $tab, $action ) {
 		if ( 'github_updater_remote_management' === $tab ) {
@@ -161,7 +168,7 @@ class Remote_Management {
 				settings_fields( 'github_updater_remote_management' );
 				do_settings_sections( 'github_updater_remote_settings' );
 				submit_button();
-			?>
+				?>
 			</form>
 			<?php
 			$reset_api_action = add_query_arg( [ 'github_updater_reset_api_key' => true ], $action );
@@ -216,11 +223,20 @@ class Remote_Management {
 			[
 				'action' => 'github-updater-update',
 				'key'    => self::$api_key,
-			], admin_url( 'admin-ajax.php' )
+			],
+			admin_url( 'admin-ajax.php' )
 		);
 		?>
 		<p>
-			<?php esc_html_e( 'Please refer to README for complete list of attributes. RESTful endpoints begin at:', 'github-updater' ); ?>
+			<?php
+			printf(
+				wp_kses_post(
+					/* translators: %s: Link to wiki */
+					__( 'Please refer to the <a href="%s">wiki</a> for complete list of attributes. RESTful endpoints begin at:', 'github-updater' )
+				),
+				'https://github.com/afragen/github-updater/wiki/Remote-Management---RESTful-Endpoints'
+			);
+			?>
 			<br>
 			<span style="font-family:monospace;"><?php echo $api_url; ?></span>
 		<p>
@@ -233,7 +249,7 @@ class Remote_Management {
 	 * Get the settings option array and print one of its values.
 	 * For remote management settings.
 	 *
-	 * @param $args
+	 * @param array $args Checkbox args.
 	 *
 	 * @return bool|void
 	 */
@@ -241,7 +257,7 @@ class Remote_Management {
 		$checked = isset( self::$options_remote[ $args['id'] ] ) ? self::$options_remote[ $args['id'] ] : null;
 		?>
 		<label for="<?php esc_attr_e( $args['id'] ); ?>">
-			<input type="checkbox" name="github_updater_remote_management[<?php esc_attr_e( $args['id'] ); ?>]" value="1" <?php checked( '1', $checked ); ?> >
+			<input type="checkbox" id="<?php esc_attr_e( $args['id'] ); ?>" name="github_updater_remote_management[<?php esc_attr_e( $args['id'] ); ?>]" value="1" <?php checked( '1', $checked ); ?> >
 			<?php echo $args['title']; ?>
 		</label>
 		<?php
@@ -265,5 +281,35 @@ class Remote_Management {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Set site transients for 'update_plugins' and 'update_themes' for remote management.
+	 *
+	 * Only call if any remote management options are present and only if on a page specified
+	 * to run remote management.
+	 *
+	 * @return void
+	 */
+	public function set_update_transients() {
+		if ( empty( self::$options_remote ) ) {
+			return;
+		}
+
+		$remote_management_pages = $this->extra_admin_pages();
+		if ( $this->is_current_page( $remote_management_pages ) ) {
+			add_filter( 'github_updater_add_admin_pages', [ $this, 'extra_admin_pages' ] );
+			add_filter( 'site_transient_update_plugins', [ Singleton::get_instance( 'Plugin', $this ), 'update_site_transient' ], 10, 1 );
+			add_filter( 'site_transient_update_themes', [ Singleton::get_instance( 'Theme', $this ), 'update_site_transient' ], 10, 1 );
+
+			Singleton::get_instance( 'Base', $this )->get_meta_remote_management();
+
+			$current_plugins = get_site_transient( 'update_plugins' );
+			$current_themes  = get_site_transient( 'update_themes' );
+			set_site_transient( 'update_plugins', $current_plugins );
+			set_site_transient( 'update_themes', $current_themes );
+
+			remove_filter( 'github_updater_add_admin_pages', [ $this, 'extra_admin_pages' ] );
+		}
 	}
 }

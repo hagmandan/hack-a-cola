@@ -4,7 +4,7 @@ Theme URI: https://wordpress.org/themes/twentyseventeen/
 Author: the WordPress team
 Author URI: https://wordpress.org/
 Description: Twenty Seventeen brings your site to life with header video and immersive featured images. With a focus on business sites, it features multiple sections on the front page as well as widgets, navigation and social menus, a logo, and more. Personalize its asymmetrical grid with a custom color scheme and showcase your multimedia content with post formats. Our default theme for 2017 works great in many languages, for any abilities, and on any device.
-Version: 1.6
+Version: 2.2
 License: GNU General Public License v2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: twentyseventeen
@@ -982,6 +982,11 @@ select {
 	max-width: 100%;
 }
 
+input[type="radio"]:focus,
+input[type="checkbox"]:focus {
+	outline: thin dotted #333;
+}
+
 input[type="radio"],
 input[type="checkbox"] {
 	margin-right: 0.5em;
@@ -1029,7 +1034,7 @@ input[type="submit"].secondary {
 	color: #222;
 }
 
-button:hover,
+button:hover:not( .mejs-container > button ),
 button:focus,
 input[type="button"]:hover,
 input[type="button"]:focus,
@@ -1164,18 +1169,20 @@ a {
 	text-decoration: none;
 }
 
-a:hover {
-	color: #e81313;
-	text-decoration: underline;
-}
 a:focus {
 	outline: thin dotted;
 }
 
+a:hover,
+a:active {
+	color: #e81313;
+	outline: 0;
+	text-decoration: underline;
+}
 
 /* Hover effects */
 
-/*.entry-content a,
+/* .entry-content a,
 .entry-summary a,
 .comment-content a,
 .widget a,
@@ -1188,8 +1195,8 @@ a:focus {
 	transition: color 80ms ease-in, -webkit-box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out, -webkit-box-shadow 130ms ease-in-out;
-}*/
-/*
+} */
+
 .entry-title a,
 .entry-meta a,
 .page-links a,
@@ -1219,9 +1226,9 @@ a .nav-title,
 	transition: color 80ms ease-in, -webkit-box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out;
 	transition: color 80ms ease-in, box-shadow 130ms ease-in-out, -webkit-box-shadow 130ms ease-in-out;
-}*/
+}
 
-/*.entry-content a:focus,
+.entry-content a:focus,
 .entry-content a:hover,
 .entry-summary a:focus,
 .entry-summary a:hover,
@@ -1274,20 +1281,20 @@ a:hover .nav-title,
 	color: #000;
 	-webkit-box-shadow: inset 0 0 0 rgba(0, 0, 0, 0), 0 3px 0 rgba(0, 0, 0, 1);
 	box-shadow: inset 0 0 0 rgba(0, 0, 0, 0), 0 3px 0 rgba(0, 0, 0, 1);
-}*/
+}
 
 /* Fixes linked images */
-/*.entry-content a img,
+/* .entry-content a img,
 .comment-content a img,
 .widget a img {
 	-webkit-box-shadow: 0 0 0 8px #fff;
 	box-shadow: 0 0 0 8px #fff;
-}*/
+} */
 
-/*.post-navigation a:focus .icon,
+/* .post-navigation a:focus .icon,
 .post-navigation a:hover .icon {
 	color: #222;
-}*/
+} */
 
 /*--------------------------------------------------------------
 11.0 Featured Image Hover
@@ -1640,6 +1647,7 @@ body.home.title-tagline-hidden.has-header-video .custom-logo-link img {
 
 body:not(.title-tagline-hidden) .site-branding-text {
 	display: inline-block;
+	max-width: 100%;
 	vertical-align: middle;
 }
 
@@ -1742,7 +1750,6 @@ body:not(.title-tagline-hidden) .site-branding-text {
 @supports ( object-fit: cover ) {
 	.has-header-image .custom-header-media img,
 	.has-header-video .custom-header-media video,
-	.has-header-video .custom-header-media iframe,
 	.has-header-image:not(.twentyseventeen-front-page):not(.home) .custom-header-media img {
 		height: 100%;
 		left: 0;
@@ -3850,8 +3857,8 @@ p > object:only-child {
 	body.has-sidebar.error404 #primary .page-header,
 	body.page-two-column:not(.archive) #primary .entry-header,
 	body.page-two-column.archive:not(.has-sidebar) #primary .page-header {
-		float: none;
-		width: auto;
+		float: left;
+		width: 36%;
 	}
 
 	.blog:not(.has-sidebar) #primary article,
@@ -3861,8 +3868,8 @@ p > object:only-child {
 	.error404.has-sidebar #primary .page-content,
 	body.page-two-column:not(.archive) #primary .entry-content,
 	body.page-two-column #comments {
-		float: none;
-		width: auto;
+		float: right;
+		width: 58%;
 	}
 
 	.blog .site-main > article,
@@ -4335,90 +4342,4 @@ p > object:only-child {
 	.site-footer {
 		padding: 0;
 	}
-}
-
-
-/*--------------------------------------------------------------
->>> All of  my overrides! (laziness wins sometimes)
-----------------------------------------------------------------
-*/
-/* Override widget styles here, so things locally overridden are captured for all */
-/* forms login, reg */
-#main .um-col-121 {
-	float: left;
-	width: 48%;
-}
-#main .um-col-122 {
-	float: right;
-	width: 48%;
-}
-#main .um-field-label label {
-	display: inline-block;
-}
-
-/* the header logo  */
-#page .site-branding-text {
-	width: 100%;
-	height: 100%;
-}
-#page .site-title {
-	  background: url(/logo.svg);
-    background-repeat: no-repeat;
-    background-size: contain;
-    width: 600px;
-		max-width: 100%;
-    height: 220px;
-		max-height: 100%;
-    display: block;
-}
-#page .site-title a {
-	display: block;
-	width: 100%;
-	height: 100%;
-	text-indent: -9999px;
-}
-#primary {
-	position: relative;
-}
-#page .site-content {
-	padding-top: 1em;
-}
-/* move around profile images */
-#page .um-profile .um-header.no-cover {
-	position: absolute;
-	width: 225px;
-	right: 0;
-	top: -88px;
-	z-index: 99;
-	padding: 0;
-	border: 0;
-}
-#page .um-8.um .um-profile-photo a.um-profile-photo-img {
-	top: auto!important;
-}
-#page .um-row-heading {
-	    padding: 0.5em 0.5em 1.5em 0;
-	font-size: 1.5em;
-    border-top: 1px solid rgba(0,0,0,0.1);
-    border-right: 1px solid rgba(0,0,0,0.1);
-    text-align: right;
-}
-
-/* adjust page header if wiki content is auto-embeded */
-#rdp-we-main + article .entry-title {
-	text-align: right;
-	border-top: 1px solid rgba(0,0,0,0.15);
-	margin: 3em 0 0;
-	padding: 1em;
-	color: rgba(0,0,0,0.45);
-}
-
-/* for p empty p tags that have a br in them, hide the br */
-#rdp-we-main p > br:first-child:last-child {
-    display: none;
-}
-
-#page #rdp-we-main .firstHeading {
-	margin: 1em 0 .5em;
-  padding-bottom: .25em;
 }
